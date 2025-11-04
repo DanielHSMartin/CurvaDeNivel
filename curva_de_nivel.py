@@ -43,7 +43,7 @@ import processing
 from qgis.core import QgsProcessingAlgorithm, QgsApplication
 from .curva_de_nivel_provider import CurvaDeNivelProvider
 
-cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
+cmd_folder = os.path.dirname(__file__)
 
 if cmd_folder not in sys.path:
     sys.path.insert(0, cmd_folder)

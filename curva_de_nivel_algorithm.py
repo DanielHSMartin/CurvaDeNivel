@@ -32,7 +32,6 @@ __revision__ = '$Format:%H$'
 
 import os
 import re
-import inspect
 from urllib.parse import urlparse  
 from requests.auth import HTTPProxyAuth
 import zipfile
@@ -178,13 +177,39 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 
         # Carrega poligono da area de interesse e cria shapefile temporario
         area_interesse = self.parameterAsExtent(parameters, self.AREA_INTERESSE, context, crs=QgsCoordinateReferenceSystem("EPSG:4326"))
+        
+        # Valida se a área de interesse é válida
+        if area_interesse.isNull() or not area_interesse.isFinite():
+            raise ValueError(
+                self.tr('Área de interesse inválida (valores NaN detectados).\n\n'
+                       'Isso pode ocorrer quando:\n'
+                       '- Uma camada de polígono é selecionada mas não foi salva\n'
+                       '- A camada está vazia ou não tem geometrias válidas\n\n'
+                       'Por favor:\n'
+                       '1. Desenhe um retângulo diretamente usando a ferramenta de extent, OU\n'
+                       '2. Se usar uma camada de polígono, certifique-se de salvá-la primeiro')
+            )
+        
         geometria_area_interesse = QgsGeometry.fromRect(area_interesse)
+        
+        # Valida se a geometria foi criada com sucesso
+        if geometria_area_interesse.isNull() or geometria_area_interesse.isEmpty():
+            raise ValueError(self.tr('Não foi possível criar a geometria da área de interesse.'))
+        
         caminho_shp_area_interesse = os.path.join(self.temp_dir, 'area_interesse.shp')
         shp_area_interesse = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(caminho_shp_area_interesse)
-        layer_area_interesse = shp_area_interesse.CreateLayer("layer")
+        layer_area_interesse = shp_area_interesse.CreateLayer("layer", geom_type=ogr.wkbPolygon)
         featureDefn = layer_area_interesse.GetLayerDefn()
         feature = ogr.Feature(featureDefn)
-        feature.SetGeometry(ogr.CreateGeometryFromWkt(geometria_area_interesse.asWkt()))
+        
+        # Converte a geometria QGIS para WKT e cria a geometria OGR
+        wkt_geometria = geometria_area_interesse.asWkt()
+        ogr_geometria = ogr.CreateGeometryFromWkt(wkt_geometria)
+        
+        if ogr_geometria is None:
+            raise ValueError(self.tr('Erro ao converter a geometria para o formato OGR. WKT: {}').format(wkt_geometria))
+        
+        feature.SetGeometry(ogr_geometria)
         layer_area_interesse.CreateFeature(feature)
         shp_area_interesse = None
 
@@ -629,8 +654,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         feedback.setProgress(int((self.progresso + 1.0) * self.status_total))
        
     def icon(self):
-        cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
-        icon = QIcon(os.path.join(os.path.join(cmd_folder, 'logo.png')))
+        cmd_folder = os.path.dirname(__file__)
+        icon = QIcon(os.path.join(cmd_folder, 'logo.png'))
         return icon
         
     def name(self):

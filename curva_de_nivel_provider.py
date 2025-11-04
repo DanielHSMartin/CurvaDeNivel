@@ -31,7 +31,6 @@ __copyright__ = '(C) 2024 by Daniel Hulshof Saint Martin'
 __revision__ = '$Format:%H$'
 
 import os
-import inspect
 from qgis.PyQt.QtGui import QIcon
 from qgis.core import QgsProcessingProvider
 from .curva_de_nivel_algorithm import CurvaDeNivelAlgorithm
@@ -63,8 +62,8 @@ class CurvaDeNivelProvider(QgsProcessingProvider):
 
     def icon(self):
         
-        cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
-        icon = QIcon(os.path.join(os.path.join(cmd_folder, 'logo.png')))
+        cmd_folder = os.path.dirname(__file__)
+        icon = QIcon(os.path.join(cmd_folder, 'logo.png'))
         return icon
 
     def longName(self):

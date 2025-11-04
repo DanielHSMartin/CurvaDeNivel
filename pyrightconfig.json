@@ -1,0 +1,15 @@
+{
+    "reportMissingImports": false,
+    "reportMissingModuleSource": false,
+    "pythonVersion": "3.9",
+    "pythonPlatform": "Darwin",
+    "extraPaths": [
+        "/Applications/QGIS.app/Contents/Resources/python",
+        "/Applications/QGIS.app/Contents/Resources/python/plugins"
+    ],
+    "ignore": [
+        "**/__pycache__",
+        "**/node_modules",
+        "**/.venv"
+    ]
+}
