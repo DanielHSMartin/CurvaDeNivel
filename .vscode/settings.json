@@ -2,10 +2,6 @@
     "workbench.editor.enablePreview": false,
     "workbench.editor.enablePreviewFromQuickOpen": false,
     "workbench.editor.enablePreviewFromCodeNavigation": false,
-    "python.analysis.extraPaths": [
-        "/Applications/QGIS.app/Contents/Resources/python",
-        "/Applications/QGIS.app/Contents/Resources/python/plugins"
-    ],
     "python.autoComplete.extraPaths": [
         "/Applications/QGIS.app/Contents/Resources/python",
         "/Applications/QGIS.app/Contents/Resources/python/plugins"

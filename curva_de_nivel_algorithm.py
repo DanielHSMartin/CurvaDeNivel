@@ -402,6 +402,9 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 layer_temp.CreateField(field_defn)
                 field_defn = ogr.FieldDefn("ELEV", ogr.OFTReal)
                 layer_temp.CreateField(field_defn)
+                field_defn = ogr.FieldDefn("TYPE", ogr.OFTString)
+                field_defn.SetWidth(50)
+                layer_temp.CreateField(field_defn)
                 raster_merged = gdal.Open(os.path.join(self.temp_dir, 'merged.tif'))
                 gdal.ContourGenerate(raster_merged.GetRasterBand(1), intervalo, 0, [], 0, 0, layer_temp, 0, 1, callback=callback_gdal)
                 shp_temp = None
@@ -421,7 +424,9 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
                         context, layer.fields(), layer.wkbType(), QgsCoordinateReferenceSystem("EPSG:4326"))
                 for feature in layer.getFeatures():
-                    sink.addFeature(feature, QgsFeatureSink.FastInsert)
+                    new_feature = QgsFeature(feature)
+                    new_feature.setAttribute('TYPE', 'contourLine')
+                    sink.addFeature(new_feature, QgsFeatureSink.FastInsert)
                                         
                 # Modifica a simbologia
                 layer_curvas = QgsProcessingUtils.mapLayerFromString(dest_id, context)
@@ -574,7 +579,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
         # Normaliza o vrt do tpi
         try:
-            maxValue = re.findall('[0-9]*\.[0-9]*', re.findall('STATISTICS_MAXIMUM=\d*.\d*', info)[0])[0]
+            maxValue = re.findall(r'[0-9]*\.[0-9]*', re.findall(r'STATISTICS_MAXIMUM=\d*\.\d*', info)[0])[0]
             Calc(
                 calc=f"A / {maxValue}",
                 A=os.path.join(path, 'tpi_blur_3x3.vrt'),
