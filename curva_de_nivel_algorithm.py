@@ -300,7 +300,20 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 try:
                     opener = proxy_opener if proxy_opener else urllib.request.build_opener()
                     with opener.open(raster_url, timeout=30) as response:
-                        content = response.read()
+                        total_size = int(response.headers.get('Content-Length', 0))
+                        chunks = []
+                        bytes_received = 0
+                        chunk_size = 65536
+                        while True:
+                            chunk = response.read(chunk_size)
+                            if not chunk:
+                                break
+                            chunks.append(chunk)
+                            bytes_received += len(chunk)
+                            if total_size > 0:
+                                progresso_download = self.progresso + bytes_received / total_size
+                                feedback.setProgress(int(progresso_download * self.status_total))
+                        content = b''.join(chunks)
                     if content:
                         with tempfile.TemporaryFile() as zip:
                             zip.write(content)
