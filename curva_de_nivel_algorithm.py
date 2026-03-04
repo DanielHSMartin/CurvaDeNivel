@@ -247,8 +247,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 proxy_opener = urllib.request.build_opener(
                     proxy_handler, proxy_auth_handler)
                 feedback.pushInfo(
-                    '\nUtilizando autenticação de proxy para usuário: ' +
-                    proxy_user)
+                    '\nUtilizando autenticação de proxy para usuário: '
+                    + proxy_user)
             except Exception as e:
                 feedback.pushInfo(
                     '\nErro ao carregar dados de autenticação de proxy: ' + str(e))
@@ -497,8 +497,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 project_crs = context.project().crs()
                 if project_crs.isValid() and project_crs.authid().upper() != 'EPSG:4326':
                     feedback.pushInfo(
-                        '\nReprojectando curvas para ' +
-                        project_crs.authid())
+                        '\nReprojectando curvas para '
+                        + project_crs.authid())
                     tmp_reproj_dir = tempfile.mkdtemp(
                         dir=self.temp_dir, prefix='curvasdenivel_reproj_')
                     caminho_shp_reproj = os.path.join(
@@ -515,8 +515,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
                 # Grava dados no arquivo de saída
                 layer = QgsVectorLayer(caminho_shp_final, 'Curvas De Nivel')
-                feedback.pushInfo('Numero de curvas geradas: ' +
-                                  str(len(list(layer.getFeatures()))))
+                feedback.pushInfo('Numero de curvas geradas: '
+                                  + str(len(list(layer.getFeatures()))))
 
                 # Modifica a simbologia
                 layer_curvas = layer

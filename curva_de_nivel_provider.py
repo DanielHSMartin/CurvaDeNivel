@@ -61,7 +61,6 @@ class CurvaDeNivelProvider(QgsProcessingProvider):
         return self.tr('Curva de Nivel')
 
     def icon(self):
-        
         cmd_folder = os.path.dirname(__file__)
         icon = QIcon(os.path.join(cmd_folder, 'logo.png'))
         return icon
