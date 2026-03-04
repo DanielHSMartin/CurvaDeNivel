@@ -393,9 +393,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                
                 # Gera as curvas de nível a partir da imagem unificada
                 feedback.pushInfo('\nGerando curvas de nível')
-                caminho_shp_temp = os.path.join(self.temp_dir, 'curvasdenivel.shp')
-                if os.path.exists(caminho_shp_temp):
-                    shp_driver.DeleteDataSource(caminho_shp_temp)
+                tmp_shp_dir = tempfile.mkdtemp(dir=self.temp_dir, prefix='curvasdenivel_')
+                caminho_shp_temp = os.path.join(tmp_shp_dir, 'curvasdenivel.shp')
                 shp_temp = shp_driver.CreateDataSource(caminho_shp_temp)
                 srs_4326 = osr.SpatialReference()
                 srs_4326.ImportFromEPSG(4326)
@@ -425,9 +424,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 project_crs = context.project().crs()
                 if project_crs.isValid() and project_crs.authid().upper() != 'EPSG:4326':
                     feedback.pushInfo('\nReprojectando curvas para ' + project_crs.authid())
-                    caminho_shp_reproj = os.path.join(self.temp_dir, 'curvasdenivel_reproj.shp')
-                    if os.path.exists(caminho_shp_reproj):
-                        shp_driver.DeleteDataSource(caminho_shp_reproj)
+                    tmp_reproj_dir = tempfile.mkdtemp(dir=self.temp_dir, prefix='curvasdenivel_reproj_')
+                    caminho_shp_reproj = os.path.join(tmp_reproj_dir, 'curvasdenivel_reproj.shp')
                     gdal.VectorTranslate(
                         caminho_shp_reproj,
                         caminho_shp_temp,
