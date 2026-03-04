@@ -32,6 +32,7 @@ __revision__ = '$Format:%H$'
 
 import os
 import re
+import urllib.request
 from urllib.parse import urlparse
 import zipfile
 import tempfile
@@ -40,18 +41,12 @@ from osgeo import gdal, ogr, osr
 from .gdal_calc import Calc
 from qgis.PyQt.QtGui import (QIcon,
                             QColor)
-from  qgis.PyQt.QtNetwork import (QNetworkProxy,
-                                    QNetworkReply,
-                                    QNetworkRequest)
-from qgis.PyQt.QtCore import (QCoreApplication,
-                                QSettings,
-                                QUrl)
+from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import ( Qgis,
                         QgsApplication,
                         QgsAuthMethodConfig,
                         QgsCoordinateReferenceSystem,
                         QgsGeometry,
-                        QgsNetworkAccessManager,
                         QgsPalLayerSettings,
                         QgsPointXY,
                         QgsProcessingAlgorithm,
@@ -216,7 +211,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         cor_curva = self.parameterAsColor(parameters, self.COR_CURVAS, context)
         
         # Carrega dados de autenticação para proxy
-        proxy = QNetworkProxy()
+        usar_proxy = 0
+        proxy_opener = None
         autentic = self.parameterAsString(parameters, self.AUTENTIC, context)
         if (autentic == ''):
             feedback.pushInfo ('\nSem autenticação de proxy')
@@ -225,16 +221,21 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             auth_cfg = QgsAuthMethodConfig()
             auth_mgr.loadAuthenticationConfig(autentic, auth_cfg, True)
             auth_info = auth_cfg.configMap()
-            try:                    
-                proxy.setType(QNetworkProxy.HttpProxy)
-                proxy.setHostName(urlparse(auth_info['realm']).hostname)
-                proxy.setPort(urlparse(auth_info['realm']).port)
-                proxy.setUser(auth_info['username'])
-                proxy.setPassword(auth_info['password'])
+            try:
+                proxy_host = urlparse(auth_info['realm']).hostname
+                proxy_port = urlparse(auth_info['realm']).port
+                proxy_user = auth_info['username']
+                proxy_pass = auth_info['password']
+                proxy_base_url = 'http://{}:{}'.format(proxy_host, proxy_port)
+                proxy_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+                proxy_mgr.add_password(None, proxy_base_url, proxy_user, proxy_pass)
+                proxy_auth_handler = urllib.request.ProxyBasicAuthHandler(proxy_mgr)
+                proxy_handler = urllib.request.ProxyHandler({'http': proxy_base_url, 'https': proxy_base_url})
+                proxy_opener = urllib.request.build_opener(proxy_handler, proxy_auth_handler)
                 usar_proxy = 1
-                feedback.pushInfo ('\nUtilizando autenticação de proxy para usuário: ' + auth_info['username'])
-            except:
-                feedback.pushInfo ('\nErro ao carregar dados de autenticação de proxy')
+                feedback.pushInfo ('\nUtilizando autenticação de proxy para usuário: ' + proxy_user)
+            except Exception as e:
+                feedback.pushInfo ('\nErro ao carregar dados de autenticação de proxy: ' + str(e))
 
         # Define o caminho para baixar os rasters do INPE
         caminho_raster = 'http://www.dsr.inpe.br/topodata/data/geotiff/'
@@ -284,38 +285,38 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         self.progresso += 1
         feedback.setProgress(int(self.progresso * self.status_total))
 
-        # Define funções de callback do download
-        def proxyAuthenticationRequired(proxy, authenticator):
-            feedback.pushInfo('Solicitando autenticação de proxy')
-        def downloadProgress(requestId: int, bytesReceived: int, bytesTotal: int):
-            if bytesTotal > 0:
-                progresso_download = self.progresso + bytesReceived / bytesTotal
-                feedback.setProgress(int(progresso_download * self.status_total))
+        # Busca os rasters necessários na memória, se não encontrar faz o download
+        for raster in lista_rasters[:]:
+            if feedback.isCanceled():
+                feedback.pushInfo('\nCancelado pelo usuário')
+                return {}
 
-        networkAccessManager = QgsNetworkAccessManager.instance()
-        networkAccessManager.proxyAuthenticationRequired.connect(proxyAuthenticationRequired)
-        networkAccessManager.downloadProgress.connect(downloadProgress)
-
-        try:
-            # Busca os rasters necessários na memória, se não encontrar faz o download
-            for raster in lista_rasters[:]:
-                if feedback.isCanceled():
-                    feedback.pushInfo('\nCancelado pelo usuário')
-                    return {}
-
-                feedback.pushInfo('\nBuscando arquivo Raster: ' + raster + '.tif')
-                if os.path.exists(os.path.join(self.temp_dir, raster + '.tif')):
-                    feedback.pushInfo('Arquivo localizado no disco')
-                else:
-                    feedback.pushInfo('Baixando arquivo raster: ' + raster + '.zip')
-                    raster_url = caminho_raster + raster + '.zip'
-
-                    networkAccessManager.setTimeout(5000)
-                    networkAccessManager.setFallbackProxyAndExcludes(proxy, [], [])
-                    raster_zip = networkAccessManager.blockingGet(QNetworkRequest(QUrl(raster_url)), forceRefresh=True, feedback=feedback)
-                    if raster_zip.error() == QNetworkReply.NoError and raster_zip.content():
+            feedback.pushInfo('\nBuscando arquivo Raster: ' + raster + '.tif')
+            if os.path.exists(os.path.join(self.temp_dir, raster + '.tif')):
+                feedback.pushInfo('Arquivo localizado no disco')
+            else:
+                feedback.pushInfo('Baixando arquivo raster: ' + raster + '.zip')
+                raster_url = caminho_raster + raster + '.zip'
+                try:
+                    opener = proxy_opener if proxy_opener else urllib.request.build_opener()
+                    with opener.open(raster_url, timeout=30) as response:
+                        total_size = int(response.headers.get('Content-Length', 0))
+                        chunks = []
+                        bytes_received = 0
+                        chunk_size = 65536
+                        while True:
+                            chunk = response.read(chunk_size)
+                            if not chunk:
+                                break
+                            chunks.append(chunk)
+                            bytes_received += len(chunk)
+                            if total_size > 0:
+                                progresso_download = self.progresso + bytes_received / total_size
+                                feedback.setProgress(int(progresso_download * self.status_total))
+                        content = b''.join(chunks)
+                    if content:
                         with tempfile.TemporaryFile() as zip:
-                            zip.write(raster_zip.content())
+                            zip.write(content)
                             with zipfile.ZipFile(zip) as zf:
                                 files = zf.namelist()
                                 for filename in files:
@@ -324,17 +325,17 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                                     with open(file_path, 'wb') as f:
                                         f.write(zf.read(filename))
                     else:
-                        feedback.pushInfo('\nErro ao baixar o arquivo: ' + raster_url)
-                        feedback.pushInfo('\nVerifique o proxy ou a conexão com a internet')
-                        feedback.pushInfo('\nCopie e cole o link acima no navegador para testar manualmente')
-                        lista_rasters.remove(raster)
+                        raise ValueError('Resposta vazia do servidor')
+                except Exception as e:
+                    feedback.pushInfo('\nErro ao baixar o arquivo: ' + raster_url)
+                    feedback.pushInfo('\nVerifique o proxy ou a conexão com a internet')
+                    feedback.pushInfo('\nCopie e cole o link acima no navegador para testar manualmente')
+                    feedback.pushInfo('\nDetalhe do erro: ' + str(e))
+                    lista_rasters.remove(raster)
 
-                # Atualiza progresso e barra
-                self.progresso += 1
-                feedback.setProgress(int(self.progresso * self.status_total))
-        finally:
-            networkAccessManager.proxyAuthenticationRequired.disconnect(proxyAuthenticationRequired)
-            networkAccessManager.downloadProgress.disconnect(downloadProgress)
+            # Atualiza progresso e barra
+            self.progresso += 1
+            feedback.setProgress(int(self.progresso * self.status_total))
 
         # Verifica se baixou algum arquivo para prosseguir com processamento, mesmo que parcial
         if (len(lista_rasters)):
@@ -392,9 +393,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                
                 # Gera as curvas de nível a partir da imagem unificada
                 feedback.pushInfo('\nGerando curvas de nível')
-                caminho_shp_temp = os.path.join(self.temp_dir, 'curvasdenivel.shp')
-                if os.path.exists(caminho_shp_temp):
-                    shp_driver.DeleteDataSource(caminho_shp_temp)
+                tmp_shp_dir = tempfile.mkdtemp(dir=self.temp_dir, prefix='curvasdenivel_')
+                caminho_shp_temp = os.path.join(tmp_shp_dir, 'curvasdenivel.shp')
                 shp_temp = shp_driver.CreateDataSource(caminho_shp_temp)
                 srs_4326 = osr.SpatialReference()
                 srs_4326.ImportFromEPSG(4326)
@@ -424,9 +424,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 project_crs = context.project().crs()
                 if project_crs.isValid() and project_crs.authid().upper() != 'EPSG:4326':
                     feedback.pushInfo('\nReprojectando curvas para ' + project_crs.authid())
-                    caminho_shp_reproj = os.path.join(self.temp_dir, 'curvasdenivel_reproj.shp')
-                    if os.path.exists(caminho_shp_reproj):
-                        shp_driver.DeleteDataSource(caminho_shp_reproj)
+                    tmp_reproj_dir = tempfile.mkdtemp(dir=self.temp_dir, prefix='curvasdenivel_reproj_')
+                    caminho_shp_reproj = os.path.join(tmp_reproj_dir, 'curvasdenivel_reproj.shp')
                     gdal.VectorTranslate(
                         caminho_shp_reproj,
                         caminho_shp_temp,
