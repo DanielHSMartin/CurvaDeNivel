@@ -36,13 +36,11 @@ import urllib.request
 from urllib.parse import urlparse
 import zipfile
 import tempfile
-import processing
 from osgeo import gdal, ogr, osr
 from .gdal_calc import Calc
-from qgis.PyQt.QtGui import (QIcon,
-                            QColor)
+from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtCore import QCoreApplication
-from qgis.core import ( Qgis,
+from qgis.core import (Qgis,
                         QgsApplication,
                         QgsAuthMethodConfig,
                         QgsCoordinateReferenceSystem,
@@ -67,9 +65,8 @@ from qgis.core import ( Qgis,
                         )
 
 
-
 '''
-    TODO: 
+    TODO:
 
     Adicionar suavização das curvas de nivel. Ferramentas necessárias:
     - gdal_translate
@@ -82,6 +79,7 @@ from qgis.core import ( Qgis,
 
 '''
 
+
 class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
     # Define constantes
@@ -90,8 +88,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
     SUAVIZACAO = 'SUAVIZACAO'
     COR_CURVAS = 'COR_CURVAS'
     AUTENTIC = 'AUTENTIC'
-    
-    
+
     def __init__(self):
         super().__init__()
         # Caminho da pasta de armazenamento temporário
@@ -103,10 +100,10 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         return super().flags() | QgsProcessingAlgorithm.FlagNoThreading
 
     def initAlgorithm(self, config):
-        
+
         # Adiciona entrada da área de interesse
         self.addParameter(QgsProcessingParameterExtent(self.AREA_INTERESSE, "Área de Interesse (selecionar)", optional=False))
-        
+
         # Adiciona intervalo entre curvas
         self.addParameter(
             QgsProcessingParameterNumber(
@@ -114,24 +111,24 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 description = self.tr('Intervalo entre curvas'),
                 type = QgsProcessingParameterNumber.Integer,
                 defaultValue = 10,
-                minValue=1, 
-                maxValue=1000, 
+                minValue=1,
+                maxValue=1000,
                 optional = False
             )
         )
-        
+
         # Adiciona nível de suavização
         self.addParameter(
             QgsProcessingParameterEnum(
                 name = self.SUAVIZACAO,
                 description = self.tr('Nível de suavização das curvas'),
-                options = ['Nenhum', 'Baixo', 'Médio', 'Alto'], 
-                defaultValue = 'Médio', 
+                options = ['Nenhum', 'Baixo', 'Médio', 'Alto'],
+                defaultValue = 'Médio',
                 usesStaticStrings = True,
                 optional = False
             )
         )
-        
+
         # Adiciona cor da curva de nivel
         self.addParameter(
             QgsProcessingParameterColor(
@@ -142,7 +139,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 optional = False
             )
         )
-        
+
         # Adiciona autenticação
         self.addParameter(
             QgsProcessingParameterAuthConfig(
@@ -153,16 +150,16 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         )
 
     def processAlgorithm(self, parameters, context, feedback):
-        
+
         # Cria pasta temporário para armazenar arquivos
         self.status_total = 0.0
         self.progresso = 0.0
         os.makedirs(self.temp_dir, exist_ok=True)
         feedback.pushInfo('\nAbrindo pasta temporária: ' + self.temp_dir)
-                
+
         # Carrega poligono da area de interesse e cria shapefile temporario
         area_interesse = self.parameterAsExtent(parameters, self.AREA_INTERESSE, context, crs=QgsCoordinateReferenceSystem("EPSG:4326"))
-        
+
         # Valida se a área de interesse é válida
         if area_interesse.isNull() or not area_interesse.isFinite():
             raise ValueError(
@@ -174,13 +171,13 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                        '1. Desenhe um retângulo diretamente usando a ferramenta de extent, OU\n'
                        '2. Se usar uma camada de polígono, certifique-se de salvá-la primeiro')
             )
-        
+
         geometria_area_interesse = QgsGeometry.fromRect(area_interesse)
-        
+
         # Valida se a geometria foi criada com sucesso
         if geometria_area_interesse.isNull() or geometria_area_interesse.isEmpty():
             raise ValueError(self.tr('Não foi possível criar a geometria da área de interesse.'))
-        
+
         caminho_shp_area_interesse = os.path.join(self.temp_dir, 'area_interesse.shp')
         shp_driver = ogr.GetDriverByName("ESRI Shapefile")
         if os.path.exists(caminho_shp_area_interesse):
@@ -189,27 +186,27 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         layer_area_interesse = shp_area_interesse.CreateLayer("layer", geom_type=ogr.wkbPolygon)
         featureDefn = layer_area_interesse.GetLayerDefn()
         feature = ogr.Feature(featureDefn)
-        
+
         # Converte a geometria QGIS para WKT e cria a geometria OGR
         wkt_geometria = geometria_area_interesse.asWkt()
         ogr_geometria = ogr.CreateGeometryFromWkt(wkt_geometria)
-        
+
         if ogr_geometria is None:
             raise ValueError(self.tr('Erro ao converter a geometria para o formato OGR. WKT: {}').format(wkt_geometria))
-        
+
         feature.SetGeometry(ogr_geometria)
         layer_area_interesse.CreateFeature(feature)
         shp_area_interesse = None
 
         # Carrega o intervalo entre as curvas de nível
         intervalo = self.parameterAsInt(parameters, self.INTERVALO, context)
-        
+
         # Carrega a opção de suavização das curvas
         suavizar = self.parameterAsString(parameters, self.SUAVIZACAO, context)
-        
+
         # Carrega a cor das curvas de nível
         cor_curva = self.parameterAsColor(parameters, self.COR_CURVAS, context)
-        
+
         # Carrega dados de autenticação para proxy
         usar_proxy = 0
         proxy_opener = None
@@ -239,12 +236,12 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
         # Define o caminho para baixar os rasters do INPE
         caminho_raster = 'http://www.dsr.inpe.br/topodata/data/geotiff/'
-        
+
         # Inicializa variaveis
         lista_rasters = []
         lat_norte = 6.0
         lon_oeste = -75.0
-                
+
         # Verifica quais arquivos raster serão utilizados
         feedback.pushInfo ('\nCalculando arquivos raster que serão utilizados')
         while (lat_norte > -34.0):
@@ -252,11 +249,11 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             while (lon_oeste < -34.5):
                 points = [QgsPointXY(lon_oeste, lat_norte), QgsPointXY(lon_oeste + 1.5, lat_norte), QgsPointXY(lon_oeste + 1.5, lat_norte - 1.0), QgsPointXY(lon_oeste, lat_norte - 1.0)]
                 poly = QgsGeometry.fromPolygonXY([points])
-                
+
                 # Testa sobreposição do polígono de interesse com os rasters
                 if not poly.intersection(geometria_area_interesse).isEmpty():
 
-                    # Contrói nome do arquivo raster 
+                    # Contrói nome do arquivo raster
                     nome_raster = list("00S00_ZN")
                     nome_raster[0] = str(abs(int(lat_norte / 10)))
                     nome_raster[1] = str(abs(int(lat_norte)) % 10)
@@ -268,19 +265,19 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                         nome_raster[5] = '_'
                     else:
                         nome_raster[5] = '5'
-                
+
                     if ''.join(nome_raster) not in lista_rasters:
                         lista_rasters.append(''.join(nome_raster))
                         feedback.pushInfo ('Arquivo necessário: ' + ''.join(nome_raster) + '.tif')
-                        
+
                 lon_oeste += 1.5
             lat_norte -= 1.0
-                
+
         # Calcula numero de etapas para barra de progresso
         numeroDeEtapas = 5 + 2*len(lista_rasters)
         self.status_total = 100.0 / numeroDeEtapas
         self.progresso = 0.0
-        
+
         # Atualiza progresso e barra
         self.progresso += 1
         feedback.setProgress(int(self.progresso * self.status_total))
@@ -342,55 +339,55 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             # Para cada raster baixado faz o corte para a área de sobreposição com a área de interesse
             feedback.pushInfo ('\nRecortando arquivos raster pela área de interesse')
             raster_clips = []
-            
+
             # Define callback da biblioteca gdal
             def callback_gdal(info, *args):
                 progresso_warp = self.progresso + info
                 feedback.setProgress(int(progresso_warp * self.status_total))
 
-            for raster in lista_rasters:                    
+            for raster in lista_rasters:
                 raster_clips.append(os.path.join(self.temp_dir, raster + '_clip.tif'))
                 fn_in = os.path.join(self.temp_dir, raster + '.tif')
                 fn_clip = os.path.join(self.temp_dir, raster + '_clip.tif')
-                
+
                 feedback.pushInfo ('Recortando: ' + raster + '.tif')
                 result = gdal.Warp(fn_clip, fn_in, cutlineDSName=caminho_shp_area_interesse, cropToCutline=True, dstNodata=0, srcSRS='EPSG:4326', dstSRS='EPSG:4326', format='GTiff', callback=callback_gdal)
                 result = None
-                
+
                 if feedback.isCanceled():
                     feedback.pushInfo ('\nCancelado pelo usuário')
                     return {}
-                
+
                 # Atualiza progresso e barra
                 self.progresso += 1
                 feedback.setProgress(int(self.progresso * self.status_total))
-            
+
             # Verifica se existem rasters cortados para unificar
             if (len(raster_clips)):
                 # Unifica todas as partes recortadas dos rasters
                 feedback.pushInfo ('\nJuntando arquivos raster recortados pela área de interesse')
                 g = gdal.Warp(os.path.join(self.temp_dir, 'merged.tif'), raster_clips, format="GTiff", callback=callback_gdal)
                 g = None
-                
+
                 if feedback.isCanceled():
                     feedback.pushInfo ('\nCancelado pelo usuário')
                     return {}
-                
+
                 # Atualiza progresso e barra
                 self.progresso += 1
                 feedback.setProgress(int(self.progresso * self.status_total))
-                
+
                 # Faz suavização
                 self.suavizaTerreno (suavizar, feedback)
-                
+
                 if feedback.isCanceled():
                     feedback.pushInfo ('\nCancelado pelo usuário')
                     return {}
-          
+
                 # Atualiza progresso e barra
                 self.progresso += 1
                 feedback.setProgress(int(self.progresso * self.status_total))
-               
+
                 # Gera as curvas de nível a partir da imagem unificada
                 feedback.pushInfo('\nGerando curvas de nível')
                 tmp_shp_dir = tempfile.mkdtemp(dir=self.temp_dir, prefix='curvasdenivel_')
@@ -438,32 +435,32 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 # Grava dados no arquivo de saída
                 layer = QgsVectorLayer(caminho_shp_final, 'Curvas De Nivel')
                 feedback.pushInfo ('Numero de curvas geradas: ' + str(len(list(layer.getFeatures()))))
-                                        
+
                 # Modifica a simbologia
                 layer_curvas = layer
                 symbol = QgsSymbol.defaultSymbol(layer_curvas.geometryType())
                 renderer = QgsRuleBasedRenderer(symbol)
                 root_rule = renderer.rootRule()
-                
+
                 # Curva Mestra
                 rule = root_rule.children()[0]
                 rule.setLabel("Curva Mestra")
                 rule.setFilterExpression(f'"ELEV" % {intervalo*5} = 0')
                 rule.symbol().setColor(cor_curva)
                 rule.symbol().setWidth(0.5)
-                  
-                # Curva Normal           
+
+                # Curva Normal
                 rule = root_rule.children()[0].clone()
                 rule.setLabel("Curva Normal")
                 rule.setFilterExpression('ELSE')
                 rule.symbol().setColor(cor_curva)
                 rule.symbol().setWidth(0.25)
                 root_rule.appendChild(rule)
-                
+
                 # Salva as regras de curva
                 layer_curvas.setRenderer(renderer)
                 layer_curvas.triggerRepaint()
-                
+
                 # Cria os rotulos e mascara
                 mask = QgsTextMaskSettings()
                 mask.setSize(2)
@@ -472,9 +469,9 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                     mask.setMaskedSymbolLayers([QgsSymbolLayerReference(layer_curvas.id(), QgsSymbolLayerId(curva_mestra_rule.ruleKey(), 0))])
                 else:
                     mask.setMaskedSymbolLayers([QgsSymbolLayerReference(layer_curvas.id(), curva_mestra_rule.symbol().symbolLayer(0).id())])
-                    
+
                 mask.setEnabled(True)
-               
+
                 # Configura texto
                 textFormat = QgsTextFormat()
                 textFormat.setSize(10)
@@ -494,18 +491,18 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 layer_curvas.setLabelsEnabled(True)
                 layer_curvas.setLabeling(QgsVectorLayerSimpleLabeling(settings))
                 layer_curvas.triggerRepaint()
-                
+
                 # Atualiza progresso e barra
                 self.progresso += 1
                 feedback.setProgress(int(self.progresso * self.status_total))
-                
+
                 feedback.pushInfo ('\n')
                 # Adiciona camada ao projeto e retorna
                 QgsProject.instance().addMapLayer(layer_curvas)
                 return {}
         else:
             feedback.pushInfo ('\nErro ao baixar os arquivos raster')
-        
+
         # Retorna sem resultado
         return {}
 
@@ -670,12 +667,12 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             )
 
         feedback.setProgress(int((self.progresso + 1.0) * self.status_total))
-       
+
     def icon(self):
         cmd_folder = os.path.dirname(__file__)
         icon = QIcon(os.path.join(cmd_folder, 'logo.png'))
         return icon
-        
+
     def name(self):
 
         return 'Curva de Nivel'

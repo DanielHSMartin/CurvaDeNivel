@@ -32,21 +32,20 @@ __revision__ = '$Format:%H$'
 
 import os
 import sys
-import inspect
 
 from qgis.PyQt.QtWidgets import QAction
 from qgis.PyQt.QtGui import QIcon
 
-from qgis.core import QgsProcessingAlgorithm, QgsApplication
+from qgis.core import QgsApplication
 import processing
 
-from qgis.core import QgsProcessingAlgorithm, QgsApplication
 from .curva_de_nivel_provider import CurvaDeNivelProvider
 
 cmd_folder = os.path.dirname(__file__)
 
 if cmd_folder not in sys.path:
     sys.path.insert(0, cmd_folder)
+
 
 class CurvaDeNivelPlugin(object):
 
@@ -61,11 +60,11 @@ class CurvaDeNivelPlugin(object):
 
     def initGui(self):
         self.initProcessing()
-        
+
         icon = os.path.join(os.path.join(cmd_folder, 'logo.png'))
         self.action = QAction(
             QIcon(icon),
-            "Curva de Nivel", 
+            "Curva de Nivel",
             self.iface.mainWindow())
         self.action.triggered.connect(self.run)
         self.iface.addPluginToMenu("&Curva de Nivel", self.action)

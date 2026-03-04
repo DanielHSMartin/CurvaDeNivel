@@ -288,11 +288,7 @@ def doit(opts, args):
                 ProgressCt+=1
                 if 10*ProgressCt/ProgressEnd%10!=ProgressMk and not opts.quiet:
                     ProgressMk=10*ProgressCt/ProgressEnd%10
-                    from sys import version_info
-                    if version_info >= (3,0,0):
-                        exec('print("%d.." % (10*ProgressMk), end=" ")')
-                    else:
-                        exec('print 10*ProgressMk, "..",')
+                    print("%d.." % (10*ProgressMk), end=" ")
 
                 # change the block size of the final piece
                 if Y==nYBlocks-1:
@@ -334,7 +330,7 @@ def doit(opts, args):
 
                 # try the calculation on the array blocks
                 try:
-                    myResult = eval(opts.calc, global_namespace, local_namespace)
+                    myResult = eval(opts.calc, global_namespace, local_namespace)  # nosec B307 - opts.calc is a user-provided raster math expression; eval is the intended behaviour of gdal_calc
                 except:
                     print("evaluation of calculation %s failed" %(opts.calc))
                     raise
