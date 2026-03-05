@@ -98,7 +98,10 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         self.progresso = 0.0
 
     def flags(self):
-        return super().flags() | QgsProcessingAlgorithm.FlagNoThreading
+        if Qgis.QGIS_VERSION_INT >= 40000:
+            return super().flags() | Qgis.ProcessingAlgorithmFlag.NoThreading
+        else:
+            return super().flags() | QgsProcessingAlgorithm.FlagNoThreading
 
     def initAlgorithm(self, config):
 
@@ -568,8 +571,12 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 settings.drawLabels = True
                 settings.repeatDistance = 50
                 settings.isExpression = True
-                settings.placement = QgsPalLayerSettings.Line
-                settings.placementFlags = QgsPalLayerSettings.OnLine
+                if Qgis.QGIS_VERSION_INT >= 40000:
+                    settings.placement = Qgis.LabelPlacementMode.Line
+                    settings.placementFlags = Qgis.LabelLinePlacementFlag.OnLine
+                else:
+                    settings.placement = QgsPalLayerSettings.Line
+                    settings.placementFlags = QgsPalLayerSettings.OnLine
                 settings.setFormat(textFormat)
                 # Grava configurações no layer e atualiza
                 layer_curvas.setLabelsEnabled(True)

@@ -5,6 +5,7 @@
 [general]
 name=Curva de Nivel
 qgisMinimumVersion=3.16
+qgisMaximumVersion=4.99
 description=Cria curvas de nivel no territorio brasileiro
 version=0.8
 author=Daniel Hulshof Saint Martin
@@ -22,7 +23,7 @@ hasProcessingProvider=yes
 # Uncomment the following line and add your changelog:
 changelog=
     Versão 0.8
-    - Correção nos caminhos dos arquivos no MacOS  e melhorias diversas
+    - Correção nos caminhos dos arquivos no MacOS e melhorias diversas
     Versão 0.7
     - Correção no acesso ao diretório temporário no MacOS
     Versão 0.6
