@@ -13,8 +13,8 @@ email=daniel.hulshof@gmail.com
 
 about=Este plugin cria curvas de nível a partir de dados geomorfométricos do território brasileiro obtidos no portal TOPODATA do INPE (http://www.dsr.inpe.br/topodata/). Os dados são baixados automaticamente e armazenados em cache local para reutilização. Funcionalidades: seleção de área de interesse, intervalo configurável entre curvas (1–1000 m), quatro níveis de suavização de terreno (Nenhum / Baixo / Médio / Alto), simbologia com curvas mestras e normais, rótulos de elevação e máscara de texto, reprojeção automática para o SRC do projeto, suporte a proxy com autenticação. ATENÇÃO: este plugin cobre apenas o território brasileiro. Para cobertura mundial, utilize o plugin Contour Lines: https://github.com/DanielHSMartin/ContourLines
 
-tracker=https://github.com/DanielHSM/CurvaDeNivel/issues
-repository=https://github.com/DanielHSM/CurvaDeNivel
+tracker=https://github.com/DanielHSMartin/CurvaDeNivel/issues
+repository=https://github.com/DanielHSMartin/CurvaDeNivel
 # End of mandatory metadata
 
 # Recommended items:
@@ -44,7 +44,7 @@ changelog=
 # Tags are comma separated with spaces allowed
 tags=python, gdal, curva, nivel, curva de nivel, altimetria, vetor, raster, contorno
 
-homepage=https://github.com/DanielHSM/CurvaDeNivel
+homepage=https://github.com/DanielHSMartin/CurvaDeNivel
 category=Analysis
 icon=icon.png
 # experimental flag
