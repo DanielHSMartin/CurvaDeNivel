@@ -2,9 +2,6 @@
 
 > **🌍 Worldwide version available!**
 > This plugin is limited to Brazilian territory. If you need to generate contour lines anywhere in the world, check out the [**Contour Lines**](https://github.com/DanielHSMartin/ContourLines) plugin, which uses the **Copernicus GLO-30** global Digital Elevation Model (ESA) with worldwide coverage at ~30 m resolution. No account or API key required.
->
-> **🌍 Versão mundial disponível!**
-> Este plugin é restrito ao território brasileiro. Se você precisa gerar curvas de nível em qualquer lugar do mundo, confira o plugin [**Contour Lines**](https://github.com/DanielHSMartin/ContourLines), que utiliza o modelo digital de elevação global **Copernicus GLO-30** (ESA) com cobertura mundial e resolução de ~30 m. Nenhuma conta ou chave de API é necessária.
 
 <p id="description">Este plugin cria curvas de nível a partir de dados geomorfométricos do território brasileiro obtidos no portal TOPODATA do INPE.</p>
 
