@@ -7,7 +7,7 @@ name=Curva de Nivel
 qgisMinimumVersion=3.16
 qgisMaximumVersion=4.99
 description=Cria curvas de nivel no territorio brasileiro
-version=0.8
+version=1.0
 author=Daniel Hulshof Saint Martin
 email=daniel.hulshof@gmail.com
 
@@ -22,6 +22,8 @@ repository=https://github.com/DanielHSMartin/CurvaDeNivel
 hasProcessingProvider=yes
 # Uncomment the following line and add your changelog:
 changelog=
+    Versão 1.0
+    - Ajustes para compatibilização com QGIS 4 e lançamento do plugin global Contour Lines
     Versão 0.8
     - Correção nos caminhos dos arquivos no MacOS e melhorias diversas
     Versão 0.7
