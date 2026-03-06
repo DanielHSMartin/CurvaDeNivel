@@ -308,6 +308,15 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 lon_oeste += 1.5
             lat_norte -= 1.0
 
+        # Verifica se a área de interesse está dentro da cobertura do INPE
+        if not lista_rasters:
+            feedback.pushInfo(
+                '\nNenhum arquivo raster encontrado para a área selecionada.'
+                '\nA base de dados TOPODATA do INPE cobre apenas o território brasileiro.'
+                '\nCobertura: lat -34°S a 6°N, lon -75°O a -34°O'
+                '\nVerifique se a área de interesse está dentro do Brasil.')
+            return {}
+
         # Calcula numero de etapas para barra de progresso
         numeroDeEtapas = 5 + 2 * len(lista_rasters)
         self.status_total = 100.0 / numeroDeEtapas
@@ -593,7 +602,10 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 QgsProject.instance().addMapLayer(layer_curvas)
                 return {}
         else:
-            feedback.pushInfo('\nErro ao baixar os arquivos raster')
+            feedback.pushInfo(
+                '\nErro ao baixar os arquivos raster'
+                '\nTodos os arquivos necessários falharam no download.'
+                '\nVerifique a conexão com a internet ou o proxy e tente novamente.')
 
         # Retorna sem resultado
         return {}
