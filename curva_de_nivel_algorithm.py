@@ -70,6 +70,10 @@ from qgis.core import (
     QgsVectorLayerSimpleLabeling
 )
 
+# URL base do Copernicus GLO-30 DEM (AWS Open Data, sem autenticação)
+# https://registry.opendata.aws/copernicus-dem/
+COPERNICUS_BASE_URL = 'https://copernicus-dem-30m.s3.amazonaws.com/'
+
 
 '''
     TODO:
@@ -90,6 +94,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
     # Define constantes
     AREA_INTERESSE = 'AREA_INTERESSE'
+    FONTE_DEM = 'FONTE_DEM'
     INTERVALO = 'INTERVALO'
     SUAVIZACAO = 'SUAVIZACAO'
     COR_CURVAS = 'COR_CURVAS'
@@ -117,6 +122,17 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 self.AREA_INTERESSE,
                 "Área de Interesse (selecionar)",
                 optional=False))
+
+        # Adiciona seleção da fonte de DEM
+        self.addParameter(
+            QgsProcessingParameterEnum(
+                name=self.FONTE_DEM,
+                description=self.tr('Fonte de dados de elevação'),
+                options=['INPE TOPODATA (Brasil)', 'Copernicus GLO-30 (Mundial)'],
+                defaultValue=0,
+                optional=False
+            )
+        )
 
         # Adiciona intervalo entre curvas
         self.addParameter(
@@ -243,6 +259,9 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         # Carrega a opção de gerar overlay de elevação
         gerar_mapa_elevacao = self.parameterAsBool(parameters, self.ELEVATION_MAP, context)
 
+        # Carrega a fonte de DEM selecionada (0 = INPE, 1 = Copernicus)
+        fonte_dem = self.parameterAsEnum(parameters, self.FONTE_DEM, context)
+
         # Carrega dados de autenticação para proxy
         proxy_opener = None
         autentic = self.parameterAsString(parameters, self.AUTENTIC, context)
@@ -275,160 +294,128 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 feedback.pushInfo(
                     '\nErro ao carregar dados de autenticação de proxy: ' + str(e))
 
-        # Define o caminho para baixar os rasters do INPE
-        caminho_raster = 'http://www.dsr.inpe.br/topodata/data/geotiff/'
+        # Define callback da biblioteca gdal
+        def callback_gdal(info, *args):
+            progresso_warp = self.progresso + info
+            feedback.setProgress(int(progresso_warp * self.status_total))
 
-        # Inicializa variaveis
-        lista_rasters = []
-        lat_norte = 6.0
-        lon_oeste = -75.0
-
-        # Verifica quais arquivos raster serão utilizados
-        feedback.pushInfo('\nCalculando arquivos raster que serão utilizados')
-        while (lat_norte > -34.0):
+        # ------------------------------------------------------------------ #
+        # Descobre e baixa tiles da fonte de DEM selecionada                  #
+        # ------------------------------------------------------------------ #
+        if fonte_dem == 0:
+            # ---- INPE TOPODATA (cobre apenas o Brasil) ------------------- #
+            caminho_raster = 'http://www.dsr.inpe.br/topodata/data/geotiff/'
+            lista_rasters = []
+            lat_norte = 6.0
             lon_oeste = -75.0
-            while (lon_oeste < -34.5):
-                points = [
-                    QgsPointXY(
-                        lon_oeste,
-                        lat_norte),
-                    QgsPointXY(
-                        lon_oeste + 1.5,
-                        lat_norte),
-                    QgsPointXY(
-                        lon_oeste + 1.5,
-                        lat_norte - 1.0),
-                    QgsPointXY(
-                        lon_oeste,
-                        lat_norte - 1.0)]
-                poly = QgsGeometry.fromPolygonXY([points])
 
-                # Testa sobreposição do polígono de interesse com os rasters
-                if not poly.intersection(geometria_area_interesse).isEmpty():
+            feedback.pushInfo('\nCalculando arquivos raster necessários (INPE TOPODATA)')
+            while (lat_norte > -34.0):
+                lon_oeste = -75.0
+                while (lon_oeste < -34.5):
+                    points = [
+                        QgsPointXY(lon_oeste, lat_norte),
+                        QgsPointXY(lon_oeste + 1.5, lat_norte),
+                        QgsPointXY(lon_oeste + 1.5, lat_norte - 1.0),
+                        QgsPointXY(lon_oeste, lat_norte - 1.0)]
+                    poly = QgsGeometry.fromPolygonXY([points])
+                    if not poly.intersection(geometria_area_interesse).isEmpty():
+                        nome_raster = list("00S00_ZN")
+                        nome_raster[0] = str(abs(int(lat_norte / 10)))
+                        nome_raster[1] = str(abs(int(lat_norte)) % 10)
+                        if lat_norte > 0:
+                            nome_raster[2] = 'N'
+                        nome_raster[3] = str(abs(int(lon_oeste / 10)))
+                        nome_raster[4] = str(abs(int(lon_oeste)) % 10)
+                        if lon_oeste % 1.0 == 0:
+                            nome_raster[5] = '_'
+                        else:
+                            nome_raster[5] = '5'
+                        if ''.join(nome_raster) not in lista_rasters:
+                            lista_rasters.append(''.join(nome_raster))
+                            feedback.pushInfo(
+                                'Arquivo necessário: ' + ''.join(nome_raster) + '.tif')
+                    lon_oeste += 1.5
+                lat_norte -= 1.0
 
-                    # Contrói nome do arquivo raster
-                    nome_raster = list("00S00_ZN")
-                    nome_raster[0] = str(abs(int(lat_norte / 10)))
-                    nome_raster[1] = str(abs(int(lat_norte)) % 10)
-                    if lat_norte > 0:
-                        nome_raster[2] = 'N'
-                    nome_raster[3] = str(abs(int(lon_oeste / 10)))
-                    nome_raster[4] = str(abs(int(lon_oeste)) % 10)
-                    if lon_oeste % 1.0 == 0:
-                        nome_raster[5] = '_'
-                    else:
-                        nome_raster[5] = '5'
-
-                    if ''.join(nome_raster) not in lista_rasters:
-                        lista_rasters.append(''.join(nome_raster))
-                        feedback.pushInfo(
-                            'Arquivo necessário: ' + ''.join(nome_raster) + '.tif')
-
-                lon_oeste += 1.5
-            lat_norte -= 1.0
-
-        # Verifica se a área de interesse está dentro da cobertura do INPE
-        if not lista_rasters:
-            feedback.pushInfo(
-                '\nNenhum arquivo raster encontrado para a área selecionada.'
-                '\nA base de dados TOPODATA do INPE cobre apenas o território brasileiro.'
-                '\nCobertura: lat -34°S a 6°N, lon -75°O a -34°O'
-                '\nVerifique se a área de interesse está dentro do Brasil.')
-            return {}
-
-        # Calcula numero de etapas para barra de progresso
-        numeroDeEtapas = 5 + 2 * len(lista_rasters)
-        self.status_total = 100.0 / numeroDeEtapas
-        self.progresso = 0.0
-
-        # Atualiza progresso e barra
-        self.progresso += 1
-        feedback.setProgress(int(self.progresso * self.status_total))
-
-        # Busca os rasters necessários na memória, se não encontrar faz o
-        # download
-        for raster in lista_rasters[:]:
-            if feedback.isCanceled():
-                feedback.pushInfo('\nCancelado pelo usuário')
+            if not lista_rasters:
+                feedback.pushInfo(
+                    '\nNenhum arquivo raster encontrado para a área selecionada.'
+                    '\nA base de dados TOPODATA do INPE cobre apenas o território brasileiro.'
+                    '\nCobertura: lat -34°S a 6°N, lon -75°O a -34°O'
+                    '\nVerifique se a área de interesse está dentro do Brasil.')
                 return {}
 
-            feedback.pushInfo('\nBuscando arquivo Raster: ' + raster + '.tif')
-            if os.path.exists(os.path.join(self.temp_dir, raster + '.tif')):
-                feedback.pushInfo('Arquivo localizado no disco')
-            else:
-                feedback.pushInfo(
-                    'Baixando arquivo raster: ' + raster + '.zip')
-                raster_url = caminho_raster + raster + '.zip'
-                try:
-                    opener = proxy_opener if proxy_opener else urllib.request.build_opener()
-                    with opener.open(raster_url, timeout=30) as response:
-                        total_size = int(
-                            response.headers.get(
-                                'Content-Length', 0))
-                        chunks = []
-                        bytes_received = 0
-                        chunk_size = 65536
-                        while True:
-                            chunk = response.read(chunk_size)
-                            if not chunk:
-                                break
-                            chunks.append(chunk)
-                            bytes_received += len(chunk)
-                            if total_size > 0:
-                                progresso_download = self.progresso + bytes_received / total_size
-                                feedback.setProgress(
-                                    int(progresso_download * self.status_total))
-                        content = b''.join(chunks)
-                    if content:
-                        with tempfile.TemporaryFile() as zip:
-                            zip.write(content)
-                            with zipfile.ZipFile(zip) as zf:
-                                files = zf.namelist()
-                                for filename in files:
-                                    feedback.pushInfo(
-                                        'Descompactando arquivo: ' + filename)
-                                    file_path = os.path.join(
-                                        self.temp_dir, filename)
-                                    with open(file_path, 'wb') as f:
-                                        f.write(zf.read(filename))
-                    else:
-                        raise ValueError('Resposta vazia do servidor')
-                except Exception as e:
-                    feedback.pushInfo(
-                        '\nErro ao baixar o arquivo: ' + raster_url)
-                    feedback.pushInfo(
-                        '\nVerifique o proxy ou a conexão com a internet')
-                    feedback.pushInfo(
-                        '\nCopie e cole o link acima no navegador para testar manualmente')
-                    feedback.pushInfo('\nDetalhe do erro: ' + str(e))
-                    lista_rasters.remove(raster)
-
-            # Atualiza progresso e barra
+            numeroDeEtapas = 5 + 2 * len(lista_rasters)
+            self.status_total = 100.0 / numeroDeEtapas
+            self.progresso = 0.0
             self.progresso += 1
             feedback.setProgress(int(self.progresso * self.status_total))
 
-        # Verifica se baixou algum arquivo para prosseguir com processamento,
-        # mesmo que parcial
-        if (len(lista_rasters)):
-            # Para cada raster baixado faz o corte para a área de sobreposição
-            # com a área de interesse
-            feedback.pushInfo(
-                '\nRecortando arquivos raster pela área de interesse')
+            for raster in lista_rasters[:]:
+                if feedback.isCanceled():
+                    feedback.pushInfo('\nCancelado pelo usuário')
+                    return {}
+                feedback.pushInfo('\nBuscando arquivo Raster: ' + raster + '.tif')
+                if os.path.exists(os.path.join(self.temp_dir, raster + '.tif')):
+                    feedback.pushInfo('Arquivo localizado no disco')
+                else:
+                    feedback.pushInfo('Baixando arquivo raster: ' + raster + '.zip')
+                    raster_url = caminho_raster + raster + '.zip'
+                    try:
+                        opener = proxy_opener if proxy_opener else urllib.request.build_opener()
+                        with opener.open(raster_url, timeout=30) as response:
+                            total_size = int(response.headers.get('Content-Length', 0))
+                            chunks = []
+                            bytes_received = 0
+                            chunk_size = 65536
+                            while True:
+                                chunk = response.read(chunk_size)
+                                if not chunk:
+                                    break
+                                chunks.append(chunk)
+                                bytes_received += len(chunk)
+                                if total_size > 0:
+                                    progresso_download = self.progresso + bytes_received / total_size
+                                    feedback.setProgress(
+                                        int(progresso_download * self.status_total))
+                            content = b''.join(chunks)
+                        if content:
+                            with tempfile.TemporaryFile() as zip:
+                                zip.write(content)
+                                with zipfile.ZipFile(zip) as zf:
+                                    files = zf.namelist()
+                                    for filename in files:
+                                        feedback.pushInfo(
+                                            'Descompactando arquivo: ' + filename)
+                                        file_path = os.path.join(self.temp_dir, filename)
+                                        with open(file_path, 'wb') as f:
+                                            f.write(zf.read(filename))
+                        else:
+                            raise ValueError('Resposta vazia do servidor')
+                    except Exception as e:
+                        feedback.pushInfo('\nErro ao baixar o arquivo: ' + raster_url)
+                        feedback.pushInfo('\nVerifique o proxy ou a conexão com a internet')
+                        feedback.pushInfo(
+                            '\nCopie e cole o link acima no navegador para testar manualmente')
+                        feedback.pushInfo('\nDetalhe do erro: ' + str(e))
+                        lista_rasters.remove(raster)
+                self.progresso += 1
+                feedback.setProgress(int(self.progresso * self.status_total))
+
+            if not lista_rasters:
+                feedback.pushInfo(
+                    '\nErro ao baixar os arquivos raster.'
+                    '\nTodos os arquivos necessários falharam no download.'
+                    '\nVerifique a conexão com a internet ou o proxy e tente novamente.')
+                return {}
+
+            feedback.pushInfo('\nRecortando arquivos raster pela área de interesse')
             raster_clips = []
-
-            # Define callback da biblioteca gdal
-            def callback_gdal(info, *args):
-                progresso_warp = self.progresso + info
-                feedback.setProgress(int(progresso_warp * self.status_total))
-
             for raster in lista_rasters:
-                raster_clips.append(
-                    os.path.join(
-                        self.temp_dir,
-                        raster + '_clip.tif'))
                 fn_in = os.path.join(self.temp_dir, raster + '.tif')
                 fn_clip = os.path.join(self.temp_dir, raster + '_clip.tif')
-
+                raster_clips.append(fn_clip)
                 feedback.pushInfo('Recortando: ' + raster + '.tif')
                 gdal.Warp(
                     fn_clip,
@@ -440,240 +427,352 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                     dstSRS='EPSG:4326',
                     format='GTiff',
                     callback=callback_gdal)
-
                 if feedback.isCanceled():
                     feedback.pushInfo('\nCancelado pelo usuário')
                     return {}
-
-                # Atualiza progresso e barra
                 self.progresso += 1
                 feedback.setProgress(int(self.progresso * self.status_total))
 
-            # Verifica se existem rasters cortados para unificar
-            if (len(raster_clips)):
-                # Unifica todas as partes recortadas dos rasters
-                feedback.pushInfo(
-                    '\nJuntando arquivos raster recortados pela área de interesse')
-                gdal.Warp(
-                    os.path.join(
-                        self.temp_dir,
-                        'merged.tif'),
-                    raster_clips,
-                    format="GTiff",
-                    callback=callback_gdal)
-
-                if feedback.isCanceled():
-                    feedback.pushInfo('\nCancelado pelo usuário')
-                    return {}
-
-                # Atualiza progresso e barra
-                self.progresso += 1
-                feedback.setProgress(int(self.progresso * self.status_total))
-
-                # Guarda cópia do DEM antes da suavização para o overlay de elevação
-                elevation_dem_path = os.path.join(self.temp_dir, 'elevation.tif')
-                shutil.copy2(os.path.join(self.temp_dir, 'merged.tif'), elevation_dem_path)
-
-                # Faz suavização
-                self.suavizaTerreno(suavizar, feedback)
-
-                if feedback.isCanceled():
-                    feedback.pushInfo('\nCancelado pelo usuário')
-                    return {}
-
-                # Atualiza progresso e barra
-                self.progresso += 1
-                feedback.setProgress(int(self.progresso * self.status_total))
-
-                # Gera as curvas de nível a partir da imagem unificada
-                feedback.pushInfo('\nGerando curvas de nível')
-                tmp_shp_dir = tempfile.mkdtemp(
-                    dir=self.temp_dir, prefix='curvasdenivel_')
-                caminho_shp_temp = os.path.join(
-                    tmp_shp_dir, 'curvasdenivel.shp')
-                shp_temp = shp_driver.CreateDataSource(caminho_shp_temp)
-                srs_4326 = osr.SpatialReference()
-                srs_4326.ImportFromEPSG(4326)
-                srs_4326.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-                layer_temp = shp_temp.CreateLayer(
-                    "Curvas De Nivel", srs=srs_4326)
-                field_defn = ogr.FieldDefn("ID", ogr.OFTInteger)
-                layer_temp.CreateField(field_defn)
-                field_defn = ogr.FieldDefn("ELEV", ogr.OFTReal)
-                layer_temp.CreateField(field_defn)
-                field_defn = ogr.FieldDefn("TYPE", ogr.OFTString)
-                field_defn.SetWidth(50)
-                layer_temp.CreateField(field_defn)
-                raster_merged = gdal.Open(
-                    os.path.join(self.temp_dir, 'merged.tif'))
-                gdal.ContourGenerate(
-                    raster_merged.GetRasterBand(1),
-                    intervalo,
-                    0,
-                    [],
-                    0,
-                    0,
-                    layer_temp,
-                    0,
-                    1,
-                    callback=callback_gdal)
-                shp_temp = None
-                raster_merged = None
-
-                if feedback.isCanceled():
-                    feedback.pushInfo('\nCancelado pelo usuário')
-                    return {}
-
-                # Atualiza progresso e barra
-                self.progresso += 1
-                feedback.setProgress(int(self.progresso * self.status_total))
-
-                # Reprojecta para o CRS do projeto se necessário
-                project_crs = context.project().crs()
-                if project_crs.isValid() and project_crs.authid().upper() != 'EPSG:4326':
-                    feedback.pushInfo(
-                        '\nReprojectando curvas para '
-                        + project_crs.authid())
-                    tmp_reproj_dir = tempfile.mkdtemp(
-                        dir=self.temp_dir, prefix='curvasdenivel_reproj_')
-                    caminho_shp_reproj = os.path.join(
-                        tmp_reproj_dir, 'curvasdenivel_reproj.shp')
-                    gdal.VectorTranslate(
-                        caminho_shp_reproj,
-                        caminho_shp_temp,
-                        options=gdal.VectorTranslateOptions(
-                            dstSRS=project_crs.authid(),
-                            reproject=True))
-                    caminho_shp_final = caminho_shp_reproj
-                else:
-                    caminho_shp_final = caminho_shp_temp
-
-                # Grava dados no arquivo de saída
-                layer = QgsVectorLayer(caminho_shp_final, 'Curvas De Nivel')
-                feedback.pushInfo('Numero de curvas geradas: '
-                                  + str(len(list(layer.getFeatures()))))
-
-                # Modifica a simbologia
-                layer_curvas = layer
-                symbol = QgsSymbol.defaultSymbol(layer_curvas.geometryType())
-                renderer = QgsRuleBasedRenderer(symbol)
-                root_rule = renderer.rootRule()
-
-                # Curva Mestra
-                rule = root_rule.children()[0]
-                rule.setLabel("Curva Mestra")
-                rule.setFilterExpression(f'"ELEV" % {intervalo*5} = 0')
-                rule.symbol().setColor(cor_curva)
-                rule.symbol().setWidth(0.5)
-
-                # Curva Normal
-                rule = root_rule.children()[0].clone()
-                rule.setLabel("Curva Normal")
-                rule.setFilterExpression('ELSE')
-                rule.symbol().setColor(cor_curva)
-                rule.symbol().setWidth(0.25)
-                root_rule.appendChild(rule)
-
-                # Salva as regras de curva
-                layer_curvas.setRenderer(renderer)
-                layer_curvas.triggerRepaint()
-
-                # Cria os rotulos e mascara
-                mask = QgsTextMaskSettings()
-                mask.setSize(2)
-                curva_mestra_rule = root_rule.children()[0]
-                if Qgis.QGIS_VERSION_INT < 33000:
-                    mask.setMaskedSymbolLayers([QgsSymbolLayerReference(
-                        layer_curvas.id(), QgsSymbolLayerId(curva_mestra_rule.ruleKey(), 0))])
-                else:
-                    mask.setMaskedSymbolLayers([QgsSymbolLayerReference(
-                        layer_curvas.id(), curva_mestra_rule.symbol().symbolLayer(0).id())])
-
-                mask.setEnabled(True)
-
-                # Configura texto
-                textFormat = QgsTextFormat()
-                textFormat.setSize(10)
-                textFormat.setColor(cor_curva)
-                textFormat.setMask(mask)
-                # Salva configurações
-                settings = QgsPalLayerSettings()
-                settings.fieldName = f'CASE WHEN "ELEV" % {intervalo*5} = 0 THEN "ELEV" ELSE \'\' END'
-                settings.enabled = True
-                settings.drawLabels = True
-                settings.repeatDistance = 50
-                settings.isExpression = True
-                if Qgis.QGIS_VERSION_INT >= 40000:
-                    settings.placement = Qgis.LabelPlacementMode.Line
-                    settings.placementFlags = Qgis.LabelLinePlacementFlag.OnLine
-                else:
-                    settings.placement = QgsPalLayerSettings.Line
-                    settings.placementFlags = QgsPalLayerSettings.OnLine
-                settings.setFormat(textFormat)
-                # Grava configurações no layer e atualiza
-                layer_curvas.setLabelsEnabled(True)
-                layer_curvas.setLabeling(
-                    QgsVectorLayerSimpleLabeling(settings))
-                layer_curvas.triggerRepaint()
-
-                # Atualiza progresso e barra
-                self.progresso += 1
-                feedback.setProgress(int(self.progresso * self.status_total))
-
-                feedback.pushInfo('\n')
-
-                # Adiciona Elevation Overlay raster (inserido abaixo das curvas de nível)
-                if gerar_mapa_elevacao:
-                    feedback.pushInfo('\nAdicionando camada de Elevation Overlay')
-
-                    # Grava sidecar QML com renderer hillshade, blend mode Dodge
-                    # e reamostragem cúbica (processado via <provider><resampling>).
-                    qml_path = os.path.splitext(elevation_dem_path)[0] + '.qml'
-                    qml = (
-                        '<!DOCTYPE qgis PUBLIC \'http://mrcc.com/qgis.dtd\' \'SYSTEM\'>\n'
-                        '<qgis version="3.0" styleCategories="AllStyleCategories">\n'
-                        '  <pipe>\n'
-                        '    <provider>\n'
-                        '      <resampling enabled="true" maxOversampling="2"'
-                        ' zoomedInResamplingMethod="cubic"'
-                        ' zoomedOutResamplingMethod="cubic"/>\n'
-                        '    </provider>\n'
-                        '    <rasterrenderer type="hillshade" band="1" opacity="1"'
-                        ' alphaBand="-1" azimuth="315" angle="45"'
-                        ' multidirectionlighting="0" zFactor="1">\n'
-                        '      <rasterTransparency/>\n'
-                        '    </rasterrenderer>\n'
-                        '    <brightnesscontrast brightness="0" contrast="0" gamma="1"/>\n'
-                        '    <huesaturation saturation="0" grayscaleMode="0"'
-                        ' colorizeOn="0" colorizeRed="255" colorizeGreen="128"'
-                        ' colorizeBlue="128" colorizeStrength="100" invertColors="0"/>\n'
-                        '    <rasterresampler maxOversampling="2"'
-                        ' zoomedInResampler="cubic" zoomedOutResampler="cubic"/>\n'
-                        '  </pipe>\n'
-                        '  <blendMode>3</blendMode>\n'
-                        '</qgis>\n'
-                    )
-                    with open(qml_path, 'w', encoding='utf-8') as f:
-                        f.write(qml)
-                    feedback.pushInfo('QML gravado: ' + qml_path)
-
-                    dem_layer = QgsRasterLayer(elevation_dem_path, 'Elevação (Hillshade)')
-                    if dem_layer.isValid():
-                        QgsProject.instance().addMapLayer(dem_layer)
-                    else:
-                        feedback.pushInfo(
-                            'Aviso: Não foi possível carregar a camada de Elevação (Hillshade)')
-
-                # Adiciona camada ao projeto e retorna
-                QgsProject.instance().addMapLayer(layer_curvas)
+            if not raster_clips:
+                feedback.pushInfo('\nNenhum arquivo foi recortado com sucesso.')
                 return {}
-        else:
-            feedback.pushInfo(
-                '\nErro ao baixar os arquivos raster'
-                '\nTodos os arquivos necessários falharam no download.'
-                '\nVerifique a conexão com a internet ou o proxy e tente novamente.')
 
-        # Retorna sem resultado
+            feedback.pushInfo('\nJuntando arquivos raster recortados pela área de interesse')
+            gdal.Warp(
+                os.path.join(self.temp_dir, 'merged.tif'),
+                raster_clips,
+                format='GTiff',
+                callback=callback_gdal)
+
+            if feedback.isCanceled():
+                feedback.pushInfo('\nCancelado pelo usuário')
+                return {}
+
+            self.progresso += 1
+            feedback.setProgress(int(self.progresso * self.status_total))
+
+        else:
+            # ---- Copernicus GLO-30 (AWS Open Data, worldwide) ------------ #
+            south = area_interesse.yMinimum()
+            north = area_interesse.yMaximum()
+            west = area_interesse.xMinimum()
+            east = area_interesse.xMaximum()
+
+            tile_list = []
+            feedback.pushInfo('\nCalculando tiles Copernicus GLO-30 necessários')
+            for lat in range(math.floor(south), math.ceil(north)):
+                for lon in range(math.floor(west), math.ceil(east)):
+                    tile_points = [
+                        QgsPointXY(lon, lat),
+                        QgsPointXY(lon + 1, lat),
+                        QgsPointXY(lon + 1, lat + 1),
+                        QgsPointXY(lon, lat + 1)]
+                    tile_poly = QgsGeometry.fromPolygonXY([tile_points])
+                    if tile_poly.intersection(geometria_area_interesse).isEmpty():
+                        continue
+                    ns = 'N' if lat >= 0 else 'S'
+                    ew = 'E' if lon >= 0 else 'W'
+                    tile_name = 'Copernicus_DSM_COG_10_{}{:02d}_00_{}{:03d}_00_DEM'.format(
+                        ns, abs(lat), ew, abs(lon))
+                    if tile_name not in tile_list:
+                        tile_list.append(tile_name)
+                        feedback.pushInfo('Tile necessário: ' + tile_name)
+
+            if not tile_list:
+                feedback.pushInfo('\nNenhum tile Copernicus encontrado para a área selecionada.')
+                return {}
+
+            numeroDeEtapas = 5 + 2 * len(tile_list)
+            self.status_total = 100.0 / numeroDeEtapas
+            self.progresso = 0.0
+            self.progresso += 1
+            feedback.setProgress(int(self.progresso * self.status_total))
+
+            for tile_name in tile_list[:]:
+                if feedback.isCanceled():
+                    feedback.pushInfo('\nCancelado pelo usuário')
+                    return {}
+                local_tif = os.path.join(self.temp_dir, tile_name + '.tif')
+                feedback.pushInfo('\nBuscando tile: ' + tile_name + '.tif')
+                if os.path.exists(local_tif):
+                    feedback.pushInfo('Tile localizado no disco')
+                else:
+                    tile_url = '{}{}/{}.tif'.format(
+                        COPERNICUS_BASE_URL, tile_name, tile_name)
+                    feedback.pushInfo('Baixando: ' + tile_url)
+                    try:
+                        opener = proxy_opener if proxy_opener else urllib.request.build_opener()
+                        with opener.open(tile_url, timeout=60) as response:
+                            total_size = int(response.headers.get('Content-Length', 0))
+                            chunks = []
+                            bytes_received = 0
+                            chunk_size = 65536
+                            while True:
+                                chunk = response.read(chunk_size)
+                                if not chunk:
+                                    break
+                                chunks.append(chunk)
+                                bytes_received += len(chunk)
+                                if total_size > 0:
+                                    progresso_download = self.progresso + bytes_received / total_size
+                                    feedback.setProgress(
+                                        int(progresso_download * self.status_total))
+                            content = b''.join(chunks)
+                        if content:
+                            with open(local_tif, 'wb') as f:
+                                f.write(content)
+                        else:
+                            raise ValueError('Resposta vazia do servidor')
+                    except urllib.error.HTTPError as e:
+                        if e.code == 404:
+                            feedback.pushInfo(
+                                'AVISO: Tile não disponível (HTTP 404) — '
+                                'pode ser área oceânica ou tile restrito: ' + tile_name)
+                        else:
+                            feedback.pushInfo('\nErro HTTP ao baixar tile: ' + str(e))
+                            feedback.pushInfo('URL: ' + tile_url)
+                        tile_list.remove(tile_name)
+                    except Exception as e:
+                        feedback.pushInfo('\nErro ao baixar tile: ' + tile_url)
+                        feedback.pushInfo(
+                            '\nVerifique o proxy ou a conexão com a internet')
+                        feedback.pushInfo('\nDetalhe do erro: ' + str(e))
+                        tile_list.remove(tile_name)
+                self.progresso += 1
+                feedback.setProgress(int(self.progresso * self.status_total))
+
+            if not tile_list:
+                feedback.pushInfo('\nNenhum tile foi baixado com sucesso.')
+                return {}
+
+            feedback.pushInfo('\nRecortando tiles pela área de interesse')
+            raster_clips = []
+            for tile_name in tile_list:
+                fn_in = os.path.join(self.temp_dir, tile_name + '.tif')
+                fn_clip = os.path.join(self.temp_dir, tile_name + '_clip.tif')
+                raster_clips.append(fn_clip)
+                feedback.pushInfo('Recortando: ' + tile_name + '.tif')
+                gdal.Warp(
+                    fn_clip,
+                    fn_in,
+                    cutlineDSName=caminho_shp_area_interesse,
+                    cropToCutline=True,
+                    dstNodata=-32768,
+                    srcSRS='EPSG:4326',
+                    dstSRS='EPSG:4326',
+                    format='GTiff',
+                    callback=callback_gdal)
+                if feedback.isCanceled():
+                    feedback.pushInfo('\nCancelado pelo usuário')
+                    return {}
+                self.progresso += 1
+                feedback.setProgress(int(self.progresso * self.status_total))
+
+            if not raster_clips:
+                feedback.pushInfo('\nNenhum tile foi recortado com sucesso.')
+                return {}
+
+            feedback.pushInfo('\nJuntando tiles recortados pela área de interesse')
+            gdal.Warp(
+                os.path.join(self.temp_dir, 'merged.tif'),
+                raster_clips,
+                dstNodata=-32768,
+                format='GTiff',
+                callback=callback_gdal)
+
+            if feedback.isCanceled():
+                feedback.pushInfo('\nCancelado pelo usuário')
+                return {}
+
+            self.progresso += 1
+            feedback.setProgress(int(self.progresso * self.status_total))
+
+        # ------------------------------------------------------------------ #
+        # Processamento comum: suavização, curvas de nível, simbologia        #
+        # ------------------------------------------------------------------ #
+
+        # Guarda cópia do DEM antes da suavização para o overlay de elevação
+        elevation_dem_path = os.path.join(self.temp_dir, 'elevation.tif')
+        shutil.copy2(os.path.join(self.temp_dir, 'merged.tif'), elevation_dem_path)
+
+        # Faz suavização
+        self.suavizaTerreno(suavizar, feedback)
+
+        if feedback.isCanceled():
+            feedback.pushInfo('\nCancelado pelo usuário')
+            return {}
+
+        # Atualiza progresso e barra
+        self.progresso += 1
+        feedback.setProgress(int(self.progresso * self.status_total))
+
+        # Gera as curvas de nível a partir da imagem unificada
+        feedback.pushInfo('\nGerando curvas de nível')
+        tmp_shp_dir = tempfile.mkdtemp(dir=self.temp_dir, prefix='curvasdenivel_')
+        caminho_shp_temp = os.path.join(tmp_shp_dir, 'curvasdenivel.shp')
+        shp_temp = shp_driver.CreateDataSource(caminho_shp_temp)
+        srs_4326 = osr.SpatialReference()
+        srs_4326.ImportFromEPSG(4326)
+        srs_4326.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+        layer_temp = shp_temp.CreateLayer('Curvas De Nivel', srs=srs_4326)
+        layer_temp.CreateField(ogr.FieldDefn('ID', ogr.OFTInteger))
+        layer_temp.CreateField(ogr.FieldDefn('ELEV', ogr.OFTReal))
+        field_defn = ogr.FieldDefn('TYPE', ogr.OFTString)
+        field_defn.SetWidth(50)
+        layer_temp.CreateField(field_defn)
+        raster_merged = gdal.Open(os.path.join(self.temp_dir, 'merged.tif'))
+        merged_band = raster_merged.GetRasterBand(1)
+        nodata_val = merged_band.GetNoDataValue()
+        gdal.ContourGenerate(
+            merged_band,
+            intervalo,
+            0,
+            [],
+            1 if nodata_val is not None else 0,
+            nodata_val if nodata_val is not None else 0,
+            layer_temp,
+            0,
+            1,
+            callback=callback_gdal)
+        shp_temp = None
+        raster_merged = None
+
+        if feedback.isCanceled():
+            feedback.pushInfo('\nCancelado pelo usuário')
+            return {}
+
+        # Atualiza progresso e barra
+        self.progresso += 1
+        feedback.setProgress(int(self.progresso * self.status_total))
+
+        # Reprojecta para o CRS do projeto se necessário
+        project_crs = context.project().crs()
+        if project_crs.isValid() and project_crs.authid().upper() != 'EPSG:4326':
+            feedback.pushInfo('\nReprojectando curvas para ' + project_crs.authid())
+            tmp_reproj_dir = tempfile.mkdtemp(
+                dir=self.temp_dir, prefix='curvasdenivel_reproj_')
+            caminho_shp_reproj = os.path.join(
+                tmp_reproj_dir, 'curvasdenivel_reproj.shp')
+            gdal.VectorTranslate(
+                caminho_shp_reproj,
+                caminho_shp_temp,
+                options=gdal.VectorTranslateOptions(
+                    dstSRS=project_crs.authid(),
+                    reproject=True))
+            caminho_shp_final = caminho_shp_reproj
+        else:
+            caminho_shp_final = caminho_shp_temp
+
+        # Carrega camada de curvas de nível
+        layer = QgsVectorLayer(caminho_shp_final, 'Curvas De Nivel')
+        feedback.pushInfo('Numero de curvas geradas: ' + str(len(list(layer.getFeatures()))))
+
+        # Modifica a simbologia
+        layer_curvas = layer
+        symbol = QgsSymbol.defaultSymbol(layer_curvas.geometryType())
+        renderer = QgsRuleBasedRenderer(symbol)
+        root_rule = renderer.rootRule()
+
+        # Curva Mestra
+        rule = root_rule.children()[0]
+        rule.setLabel('Curva Mestra')
+        rule.setFilterExpression(f'"ELEV" % {intervalo*5} = 0')
+        rule.symbol().setColor(cor_curva)
+        rule.symbol().setWidth(0.5)
+
+        # Curva Normal
+        rule = root_rule.children()[0].clone()
+        rule.setLabel('Curva Normal')
+        rule.setFilterExpression('ELSE')
+        rule.symbol().setColor(cor_curva)
+        rule.symbol().setWidth(0.25)
+        root_rule.appendChild(rule)
+
+        layer_curvas.setRenderer(renderer)
+        layer_curvas.triggerRepaint()
+
+        # Cria os rótulos e máscara
+        mask = QgsTextMaskSettings()
+        mask.setSize(2)
+        curva_mestra_rule = root_rule.children()[0]
+        if Qgis.QGIS_VERSION_INT < 33000:
+            mask.setMaskedSymbolLayers([QgsSymbolLayerReference(
+                layer_curvas.id(), QgsSymbolLayerId(curva_mestra_rule.ruleKey(), 0))])
+        else:
+            mask.setMaskedSymbolLayers([QgsSymbolLayerReference(
+                layer_curvas.id(), curva_mestra_rule.symbol().symbolLayer(0).id())])
+        mask.setEnabled(True)
+
+        textFormat = QgsTextFormat()
+        textFormat.setSize(10)
+        textFormat.setColor(cor_curva)
+        textFormat.setMask(mask)
+
+        settings = QgsPalLayerSettings()
+        settings.fieldName = f'CASE WHEN "ELEV" % {intervalo*5} = 0 THEN "ELEV" ELSE \'\' END'
+        settings.enabled = True
+        settings.drawLabels = True
+        settings.repeatDistance = 50
+        settings.isExpression = True
+        if Qgis.QGIS_VERSION_INT >= 40000:
+            settings.placement = Qgis.LabelPlacementMode.Line
+            settings.placementFlags = Qgis.LabelLinePlacementFlag.OnLine
+        else:
+            settings.placement = QgsPalLayerSettings.Line
+            settings.placementFlags = QgsPalLayerSettings.OnLine
+        settings.setFormat(textFormat)
+        layer_curvas.setLabelsEnabled(True)
+        layer_curvas.setLabeling(QgsVectorLayerSimpleLabeling(settings))
+        layer_curvas.triggerRepaint()
+
+        # Atualiza progresso e barra
+        self.progresso += 1
+        feedback.setProgress(int(self.progresso * self.status_total))
+
+        feedback.pushInfo('\n')
+
+        # Adiciona Elevation Overlay raster (inserido abaixo das curvas de nível)
+        if gerar_mapa_elevacao:
+            feedback.pushInfo('\nAdicionando camada de Elevation Overlay')
+
+            qml_path = os.path.splitext(elevation_dem_path)[0] + '.qml'
+            qml = (
+                '<!DOCTYPE qgis PUBLIC \'http://mrcc.com/qgis.dtd\' \'SYSTEM\'>\n'
+                '<qgis version="3.0" styleCategories="AllStyleCategories">\n'
+                '  <pipe>\n'
+                '    <provider>\n'
+                '      <resampling enabled="true" maxOversampling="2"'
+                ' zoomedInResamplingMethod="cubic"'
+                ' zoomedOutResamplingMethod="cubic"/>\n'
+                '    </provider>\n'
+                '    <rasterrenderer type="hillshade" band="1" opacity="1"'
+                ' alphaBand="-1" azimuth="315" angle="45"'
+                ' multidirectionlighting="0" zFactor="1">\n'
+                '      <rasterTransparency/>\n'
+                '    </rasterrenderer>\n'
+                '    <brightnesscontrast brightness="0" contrast="0" gamma="1"/>\n'
+                '    <huesaturation saturation="0" grayscaleMode="0"'
+                ' colorizeOn="0" colorizeRed="255" colorizeGreen="128"'
+                ' colorizeBlue="128" colorizeStrength="100" invertColors="0"/>\n'
+                '    <rasterresampler maxOversampling="2"'
+                ' zoomedInResampler="cubic" zoomedOutResampler="cubic"/>\n'
+                '  </pipe>\n'
+                '  <blendMode>3</blendMode>\n'
+                '</qgis>\n'
+            )
+            with open(qml_path, 'w', encoding='utf-8') as f:
+                f.write(qml)
+            feedback.pushInfo('QML gravado: ' + qml_path)
+
+            dem_layer = QgsRasterLayer(elevation_dem_path, 'Elevação (Hillshade)')
+            if dem_layer.isValid():
+                QgsProject.instance().addMapLayer(dem_layer)
+            else:
+                feedback.pushInfo(
+                    'Aviso: Não foi possível carregar a camada de Elevação (Hillshade)')
+
+        # Adiciona camada ao projeto e retorna
+        QgsProject.instance().addMapLayer(layer_curvas)
         return {}
 
     def suavizaTerreno(self, suavizar, feedback):
