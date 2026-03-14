@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-PLUGIN_NAME="CurvaDeNivel"
+PLUGIN_NAME="curva_de_nivel"
 METADATA="$PLUGIN_DIR/metadata.txt"
 
 VERSION=$(grep -E "^version\s*=" "$METADATA" | head -1 | sed 's/.*=\s*//' | tr -d '[:space:]')
