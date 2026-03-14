@@ -30,8 +30,11 @@ __copyright__ = '(C) 2024 by Daniel Hulshof Saint Martin'
 
 __revision__ = '$Format:%H$'
 
+import math
 import os
 import re
+import shutil
+import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 import zipfile
@@ -50,11 +53,13 @@ from qgis.core import (
     QgsPointXY,
     QgsProcessingAlgorithm,
     QgsProcessingParameterAuthConfig,
+    QgsProcessingParameterBoolean,
     QgsProcessingParameterExtent,
     QgsProcessingParameterNumber,
     QgsProcessingParameterColor,
     QgsProcessingParameterEnum,
     QgsProject,
+    QgsRasterLayer,
     QgsRuleBasedRenderer,
     QgsSymbol,
     QgsSymbolLayerReference,
@@ -88,6 +93,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
     INTERVALO = 'INTERVALO'
     SUAVIZACAO = 'SUAVIZACAO'
     COR_CURVAS = 'COR_CURVAS'
+    ELEVATION_MAP = 'ELEVATION_MAP'
     AUTENTIC = 'AUTENTIC'
 
     def __init__(self):
@@ -144,6 +150,16 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 description=self.tr('Coloração das curvas'),
                 defaultValue="#cc7700cc",
                 opacityEnabled=True,
+                optional=False
+            )
+        )
+
+        # Adiciona opção de overlay de elevação
+        self.addParameter(
+            QgsProcessingParameterBoolean(
+                name=self.ELEVATION_MAP,
+                description=self.tr('Gerar Overlay de Elevação (Hillshade)'),
+                defaultValue=True,
                 optional=False
             )
         )
@@ -223,6 +239,9 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
         # Carrega a cor das curvas de nível
         cor_curva = self.parameterAsColor(parameters, self.COR_CURVAS, context)
+
+        # Carrega a opção de gerar overlay de elevação
+        gerar_mapa_elevacao = self.parameterAsBool(parameters, self.ELEVATION_MAP, context)
 
         # Carrega dados de autenticação para proxy
         proxy_opener = None
@@ -451,6 +470,10 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 self.progresso += 1
                 feedback.setProgress(int(self.progresso * self.status_total))
 
+                # Guarda cópia do DEM antes da suavização para o overlay de elevação
+                elevation_dem_path = os.path.join(self.temp_dir, 'elevation.tif')
+                shutil.copy2(os.path.join(self.temp_dir, 'merged.tif'), elevation_dem_path)
+
                 # Faz suavização
                 self.suavizaTerreno(suavizar, feedback)
 
@@ -598,6 +621,49 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 feedback.setProgress(int(self.progresso * self.status_total))
 
                 feedback.pushInfo('\n')
+
+                # Adiciona Elevation Overlay raster (inserido abaixo das curvas de nível)
+                if gerar_mapa_elevacao:
+                    feedback.pushInfo('\nAdicionando camada de Elevation Overlay')
+
+                    # Grava sidecar QML com renderer hillshade, blend mode Dodge
+                    # e reamostragem cúbica (processado via <provider><resampling>).
+                    qml_path = os.path.splitext(elevation_dem_path)[0] + '.qml'
+                    qml = (
+                        '<!DOCTYPE qgis PUBLIC \'http://mrcc.com/qgis.dtd\' \'SYSTEM\'>\n'
+                        '<qgis version="3.0" styleCategories="AllStyleCategories">\n'
+                        '  <pipe>\n'
+                        '    <provider>\n'
+                        '      <resampling enabled="true" maxOversampling="2"'
+                        ' zoomedInResamplingMethod="cubic"'
+                        ' zoomedOutResamplingMethod="cubic"/>\n'
+                        '    </provider>\n'
+                        '    <rasterrenderer type="hillshade" band="1" opacity="1"'
+                        ' alphaBand="-1" azimuth="315" angle="45"'
+                        ' multidirectionlighting="0" zFactor="1">\n'
+                        '      <rasterTransparency/>\n'
+                        '    </rasterrenderer>\n'
+                        '    <brightnesscontrast brightness="0" contrast="0" gamma="1"/>\n'
+                        '    <huesaturation saturation="0" grayscaleMode="0"'
+                        ' colorizeOn="0" colorizeRed="255" colorizeGreen="128"'
+                        ' colorizeBlue="128" colorizeStrength="100" invertColors="0"/>\n'
+                        '    <rasterresampler maxOversampling="2"'
+                        ' zoomedInResampler="cubic" zoomedOutResampler="cubic"/>\n'
+                        '  </pipe>\n'
+                        '  <blendMode>3</blendMode>\n'
+                        '</qgis>\n'
+                    )
+                    with open(qml_path, 'w', encoding='utf-8') as f:
+                        f.write(qml)
+                    feedback.pushInfo('QML gravado: ' + qml_path)
+
+                    dem_layer = QgsRasterLayer(elevation_dem_path, 'Elevação (Hillshade)')
+                    if dem_layer.isValid():
+                        QgsProject.instance().addMapLayer(dem_layer)
+                    else:
+                        feedback.pushInfo(
+                            'Aviso: Não foi possível carregar a camada de Elevação (Hillshade)')
+
                 # Adiciona camada ao projeto e retorna
                 QgsProject.instance().addMapLayer(layer_curvas)
                 return {}
