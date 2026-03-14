@@ -7,11 +7,11 @@ name=Curva de Nivel
 qgisMinimumVersion=3.16
 qgisMaximumVersion=4.99
 description=Cria curvas de nivel no territorio brasileiro
-version=1.0
+version=1.1
 author=Daniel Hulshof Saint Martin
 email=daniel.hulshof@gmail.com
 
-about=Este plugin cria curvas de nível a partir de dados geomorfométricos do território brasileiro obtidos no portal TOPODATA do INPE (http://www.dsr.inpe.br/topodata/). Os dados são baixados automaticamente e armazenados em cache local para reutilização. Funcionalidades: seleção de área de interesse, intervalo configurável entre curvas (1–1000 m), quatro níveis de suavização de terreno (Nenhum / Baixo / Médio / Alto), simbologia com curvas mestras e normais, rótulos de elevação e máscara de texto, reprojeção automática para o SRC do projeto, suporte a proxy com autenticação. ATTENTION: This plugin is limited to Brazilian territory. If you need to generate contour lines anywhere in the world, check out the plugin Contour Lines: https://github.com/DanielHSMartin/ContourLines
+about=Este plugin cria curvas de nível a partir de dados de elevação do INPE (TOPODATA, Brasil) ou do Copernicus GLO-30 (global). Os dados são baixados automaticamente e armazenados em cache local para reutilização. Funcionalidades: seleção de área de interesse, escolha da fonte de DEM (INPE TOPODATA ou Copernicus GLO-30), intervalo configurável entre curvas (1–1000 m), quatro níveis de suavização de terreno (Nenhum / Baixo / Médio / Alto), opção de overlay de elevação com hillshade, simbologia com curvas mestras e normais, rótulos de elevação e máscara de texto, reprojeção automática para o SRC do projeto, suporte a proxy com autenticação. Note: INPE TOPODATA covers Brazilian territory only. Copernicus GLO-30 covers the entire world.
 
 tracker=https://github.com/DanielHSMartin/CurvaDeNivel/issues
 repository=https://github.com/DanielHSMartin/CurvaDeNivel
@@ -22,6 +22,9 @@ repository=https://github.com/DanielHSMartin/CurvaDeNivel
 hasProcessingProvider=yes
 # Uncomment the following line and add your changelog:
 changelog=
+    Versão 1.1
+    - Adicionada opção de seleção da fonte de DEM: INPE TOPODATA (Brasil) ou Copernicus GLO-30 (global)
+    - Adicionada opção de gerar overlay de elevação com renderização hillshade
     Versão 1.0
     - Ajustes para compatibilização com QGIS 4 e lançamento do plugin global Contour Lines
     Versão 0.8
