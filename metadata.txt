@@ -7,7 +7,7 @@ name=Curva de Nivel
 qgisMinimumVersion=3.16
 qgisMaximumVersion=4.99
 description=Cria curvas de nivel no territorio brasileiro
-version=1.1
+version=1.1.1
 author=Daniel Hulshof Saint Martin
 email=daniel.hulshof@gmail.com
 
@@ -22,6 +22,8 @@ repository=https://github.com/DanielHSMartin/CurvaDeNivel
 hasProcessingProvider=yes
 # Uncomment the following line and add your changelog:
 changelog=
+    Versão 1.1.1
+    - Corrigido uso incorreto do atributo LabelPlacement no QGIS4.
     Versão 1.1
     - Adicionada opção de seleção da fonte de DEM: INPE TOPODATA (Brasil) ou Copernicus GLO-30 (global)
     - Adicionada opção de gerar overlay de elevação com renderização hillshade

@@ -715,7 +715,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         settings.repeatDistance = 50
         settings.isExpression = True
         if Qgis.QGIS_VERSION_INT >= 40000:
-            settings.placement = Qgis.LabelPlacementMode.Line
+            settings.placement = Qgis.LabelPlacement.Line
             settings.placementFlags = Qgis.LabelLinePlacementFlag.OnLine
         else:
             settings.placement = QgsPalLayerSettings.Line
