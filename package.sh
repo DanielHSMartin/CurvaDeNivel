@@ -61,7 +61,7 @@ if ! command -v bandit &>/dev/null; then
   echo "Error: bandit not found. Install with: pip install bandit"
   exit 1
 fi
-bandit -r "$PLUGIN_DIR" -x "$PLUGIN_DIR/test/,$PLUGIN_DIR/plugin_upload.py,$PLUGIN_DIR/scripts/,$PLUGIN_DIR/gdal_calc.py" --severity-level medium -q
+bandit -r "$PLUGIN_DIR" -x "$PLUGIN_DIR/test/,$PLUGIN_DIR/plugin_upload.py,$PLUGIN_DIR/scripts/" --severity-level medium -q
 echo "OK: no Medium/High bandit findings."
 
 OUTPUT_DIR="$(dirname "$PLUGIN_DIR")"

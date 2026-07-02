@@ -376,10 +376,10 @@ def doit(opts, args):
 
                 # try the calculation on the array blocks
                 try:
-                    # nosec B307 - opts.calc is a user-provided raster
-                    # math expression; eval is the intended behaviour
+                    # opts.calc is a user-provided raster math
+                    # expression; eval is the intended behaviour
                     # of gdal_calc
-                    myResult = eval(
+                    myResult = eval(  # nosec B307
                         opts.calc, global_namespace, local_namespace)
                 except Exception:
                     print("evaluation of calculation %s failed" % (opts.calc))
