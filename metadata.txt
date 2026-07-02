@@ -6,12 +6,14 @@
 name=Curva de Nivel
 qgisMinimumVersion=3.16
 qgisMaximumVersion=4.99
-description=Cria curvas de nivel no territorio brasileiro
+description=Creates contour lines from elevation data (INPE TOPODATA for Brazil or Copernicus GLO-30 worldwide)
+description[pt_br]=Cria curvas de nível a partir de dados de elevação (INPE TOPODATA para o Brasil ou Copernicus GLO-30 para o mundo todo)
 version=1.1.3
 author=Daniel Hulshof Saint Martin
 email=daniel.hulshof@gmail.com
 
-about=Este plugin cria curvas de nível a partir de dados de elevação do INPE (TOPODATA, Brasil) ou do Copernicus GLO-30 (global). Os dados são baixados automaticamente e armazenados em cache local para reutilização. Funcionalidades: seleção de área de interesse, escolha da fonte de DEM (INPE TOPODATA ou Copernicus GLO-30), intervalo configurável entre curvas (1–1000 m), quatro níveis de suavização de terreno (Nenhum / Baixo / Médio / Alto), opção de overlay de elevação com hillshade, simbologia com curvas mestras e normais, rótulos de elevação e máscara de texto, reprojeção automática para o SRC do projeto, suporte a proxy com autenticação. Note: INPE TOPODATA covers Brazilian territory only. Copernicus GLO-30 covers the entire world.
+about=This plugin creates contour lines from elevation data provided by INPE (TOPODATA, Brazil) or Copernicus GLO-30 (worldwide). Data is downloaded automatically and cached locally for reuse. Features: area-of-interest selection, choice of DEM source (INPE TOPODATA or Copernicus GLO-30), configurable contour interval (1-1000 m), four terrain smoothing levels (None / Low / Medium / High), optional elevation overlay with hillshade rendering, symbology with index and normal contours, elevation labels with a text buffer mask, automatic reprojection to the project's CRS, proxy support with authentication. Note: INPE TOPODATA covers Brazilian territory only. Copernicus GLO-30 covers the entire world.
+about[pt_br]=Este plugin cria curvas de nível a partir de dados de elevação do INPE (TOPODATA, Brasil) ou do Copernicus GLO-30 (global). Os dados são baixados automaticamente e armazenados em cache local para reutilização. Funcionalidades: seleção de área de interesse, escolha da fonte de DEM (INPE TOPODATA ou Copernicus GLO-30), intervalo configurável entre curvas (1–1000 m), quatro níveis de suavização de terreno (Nenhum / Baixo / Médio / Alto), opção de overlay de elevação com hillshade, simbologia com curvas mestras e normais, rótulos de elevação e máscara de texto, reprojeção automática para o SRC do projeto, suporte a proxy com autenticação. Observação: o INPE TOPODATA cobre apenas o território brasileiro. O Copernicus GLO-30 cobre o mundo todo.
 
 tracker=https://github.com/DanielHSMartin/CurvaDeNivel/issues
 repository=https://github.com/DanielHSMartin/CurvaDeNivel
@@ -54,7 +56,8 @@ changelog=
     - Versão inicial para testes
 
 # Tags are comma separated with spaces allowed
-tags=python, gdal, curva, nivel, curva de nivel, altimetria, vetor, raster, contorno
+tags=python, gdal, contour, contour lines, elevation, dem, topography, vector, raster, hillshade
+tags[pt_br]=python, gdal, curva de nível, curvas de nível, altimetria, elevação, topografia, vetor, raster, hillshade
 
 homepage=https://github.com/DanielHSMartin/CurvaDeNivel
 category=Analysis
