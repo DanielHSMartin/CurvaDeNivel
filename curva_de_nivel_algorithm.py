@@ -176,7 +176,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterBoolean(
                 name=self.ELEVATION_MAP,
                 description=self.tr('Gerar Overlay de Elevação (Hillshade)'),
-                defaultValue=True,
+                defaultValue=False,
                 optional=False
             )
         )
