@@ -370,6 +370,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             self.progresso += 1
             feedback.setProgress(int(self.progresso * self.status_total))
 
+            servidor_topodata_indisponivel = False
             for raster in lista_rasters[:]:
                 if feedback.isCanceled():
                     feedback.pushInfo('\nCancelado pelo usuário')
@@ -423,6 +424,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                         else:
                             raise ValueError('Resposta vazia do servidor')
                     except Exception as e:
+                        if 'infinite loop' in str(e).lower():
+                            servidor_topodata_indisponivel = True
                         feedback.pushInfo(
                             '\nErro ao baixar o arquivo: ' + raster_url)
                         feedback.pushInfo(
@@ -437,12 +440,21 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 feedback.setProgress(int(self.progresso * self.status_total))
 
             if not lista_rasters:
-                feedback.pushInfo(
-                    '\nErro ao baixar os arquivos raster.'
+                if servidor_topodata_indisponivel:
+                    raise ValueError(self.tr(
+                        'O servidor do INPE TOPODATA'
+                        ' (www.dsr.inpe.br) está com um problema de'
+                        ' configuração (loop de redirecionamento'
+                        ' HTTP/HTTPS) e não pode ser acessado no momento.'
+                        '\n\nIsso é uma indisponibilidade do lado do INPE,'
+                        ' não do plugin. Tente novamente mais tarde ou'
+                        ' utilize a fonte Copernicus GLO-30, que cobre'
+                        ' o mesmo território.'))
+                raise ValueError(self.tr(
+                    'Erro ao baixar os arquivos raster.'
                     '\nTodos os arquivos necessários falharam no download.'
                     '\nVerifique a conexão com a internet ou'
-                    ' o proxy e tente novamente.')
-                return {}
+                    ' o proxy e tente novamente.'))
 
             feedback.pushInfo(
                 '\nRecortando arquivos raster pela área de interesse')
