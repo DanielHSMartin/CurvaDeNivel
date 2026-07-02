@@ -23,6 +23,7 @@ EXCLUDES=(
   --exclude "$PLUGIN_NAME/.venv/*"
   --exclude "$PLUGIN_NAME/.vscode/*"
   --exclude "$PLUGIN_NAME/.claude/*"
+  --exclude "$PLUGIN_NAME/CLAUDE.md"
   --exclude "$PLUGIN_NAME/scripts/*"
   --exclude "$PLUGIN_NAME/test/*"
   --exclude "$PLUGIN_NAME/Support/*"

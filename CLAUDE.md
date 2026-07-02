@@ -33,7 +33,7 @@ Before building: bump `version=` in `metadata.txt` and add a `changelog=` entry 
    `test/`, `scripts/`, and `plugin_upload.py` are dev-only and never ship. `gdal_calc.py` is excluded because its `eval()` (B307) is inherent to vendored GDAL's `--calc` feature, not our code. If this plugin ever builds a SQL/OGR query, never use f-strings or concatenation to build it (Bandit B608) — use two static query strings conditioned on a boolean instead of interpolating a clause.
 4. **Suspicious files**: after zipping, the script verifies no hidden (dot-prefixed) file made it into the archive. If you add a new dev-only dotfile/dir, add it to `EXCLUDES` in `package.sh`.
 
-NEVER package: hidden files (`.git`, `.vscode`, `.claude`, `.DS_Store`, ...), `__pycache__`/`*.pyc`, or the dev-only `test/`, `help/`, `i18n/`, `Support/`, `scripts/`, `Makefile`, `pb_tool.cfg`, `pyrightconfig.json`, `pylintrc`, `plugin_upload.py`. `package.sh`'s `EXCLUDES` list is the single source of truth for this — check it before adding new top-level dev files.
+NEVER package: hidden files (`.git`, `.vscode`, `.claude`, `.DS_Store`, ...), `__pycache__`/`*.pyc`, `CLAUDE.md`, or the dev-only `test/`, `help/`, `i18n/`, `Support/`, `scripts/`, `Makefile`, `pb_tool.cfg`, `pyrightconfig.json`, `pylintrc`, `plugin_upload.py`. `package.sh`'s `EXCLUDES` list is the single source of truth for this — check it before adding new top-level dev files.
 
 Upload is outward-facing — do NOT run it automatically; it needs the user's credentials: `python3 plugin_upload.py -u USER -w PASS ../curva_de_nivel_<version>.zip` (or the plugins.qgis.org web UI).
 
