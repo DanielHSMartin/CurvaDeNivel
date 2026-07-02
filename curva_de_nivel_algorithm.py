@@ -37,7 +37,6 @@ import shutil
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
-import zipfile
 import tempfile
 from osgeo import gdal, ogr, osr
 from .gdal_calc import Calc
@@ -316,7 +315,11 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         # ------------------------------------------------------------------ #
         if fonte_dem == 0:
             # ---- INPE TOPODATA (cobre apenas o Brasil) ------------------- #
-            caminho_raster = 'http://www.dsr.inpe.br/topodata/data/geotiff/'
+            # Catálogo STAC/COG do Brazil Data Cube (INPE). O antigo
+            # servidor www.dsr.inpe.br entra em loop de redirecionamento
+            # HTTP/HTTPS (ver issue #3); este endpoint serve os GeoTIFFs
+            # diretamente, sem zip, usando a mesma convenção de nomes.
+            caminho_raster = 'https://data.inpe.br/bdc/data/topodata/v001/'
             lista_rasters = []
             lat_norte = 6.0
             lon_oeste = -75.0
@@ -370,20 +373,22 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             self.progresso += 1
             feedback.setProgress(int(self.progresso * self.status_total))
 
-            servidor_topodata_indisponivel = False
             for raster in lista_rasters[:]:
                 if feedback.isCanceled():
                     feedback.pushInfo('\nCancelado pelo usuário')
                     return {}
                 feedback.pushInfo(
                     '\nBuscando arquivo Raster: ' + raster + '.tif')
-                if os.path.exists(
-                        os.path.join(self.temp_dir, raster + '.tif')):
+                file_path = os.path.join(self.temp_dir, raster + '.tif')
+                if os.path.exists(file_path):
                     feedback.pushInfo('Arquivo localizado no disco')
                 else:
                     feedback.pushInfo(
-                        'Baixando arquivo raster: ' + raster + '.zip')
-                    raster_url = caminho_raster + raster + '.zip'
+                        'Baixando arquivo raster: ' + raster + '.tif')
+                    tile6 = raster[:-2]
+                    raster_url = (
+                        caminho_raster + tile6[:3] + '/' + tile6[3:6]
+                        + '/' + raster + '.tif')
                     try:
                         opener = (
                             proxy_opener if proxy_opener
@@ -391,41 +396,26 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                         with opener.open(raster_url, timeout=30) as response:
                             total_size = int(
                                 response.headers.get('Content-Length', 0))
-                            chunks = []
                             bytes_received = 0
                             chunk_size = 65536
-                            while True:
-                                chunk = response.read(chunk_size)
-                                if not chunk:
-                                    break
-                                chunks.append(chunk)
-                                bytes_received += len(chunk)
-                                if total_size > 0:
-                                    progresso_download = (
-                                        self.progresso
-                                        + bytes_received / total_size)
-                                    feedback.setProgress(int(
-                                        progresso_download
-                                        * self.status_total))
-                            content = b''.join(chunks)
-                        if content:
-                            with tempfile.TemporaryFile() as zip:
-                                zip.write(content)
-                                with zipfile.ZipFile(zip) as zf:
-                                    files = zf.namelist()
-                                    for filename in files:
-                                        feedback.pushInfo(
-                                            'Descompactando arquivo: '
-                                            + filename)
-                                        file_path = os.path.join(
-                                            self.temp_dir, filename)
-                                        with open(file_path, 'wb') as f:
-                                            f.write(zf.read(filename))
-                        else:
+                            with open(file_path, 'wb') as f:
+                                while True:
+                                    chunk = response.read(chunk_size)
+                                    if not chunk:
+                                        break
+                                    f.write(chunk)
+                                    bytes_received += len(chunk)
+                                    if total_size > 0:
+                                        progresso_download = (
+                                            self.progresso
+                                            + bytes_received / total_size)
+                                        feedback.setProgress(int(
+                                            progresso_download
+                                            * self.status_total))
+                        if bytes_received == 0:
+                            os.remove(file_path)
                             raise ValueError('Resposta vazia do servidor')
                     except Exception as e:
-                        if 'infinite loop' in str(e).lower():
-                            servidor_topodata_indisponivel = True
                         feedback.pushInfo(
                             '\nErro ao baixar o arquivo: ' + raster_url)
                         feedback.pushInfo(
@@ -440,16 +430,6 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 feedback.setProgress(int(self.progresso * self.status_total))
 
             if not lista_rasters:
-                if servidor_topodata_indisponivel:
-                    raise ValueError(self.tr(
-                        'O servidor do INPE TOPODATA'
-                        ' (www.dsr.inpe.br) está com um problema de'
-                        ' configuração (loop de redirecionamento'
-                        ' HTTP/HTTPS) e não pode ser acessado no momento.'
-                        '\n\nIsso é uma indisponibilidade do lado do INPE,'
-                        ' não do plugin. Tente novamente mais tarde ou'
-                        ' utilize a fonte Copernicus GLO-30, que cobre'
-                        ' o mesmo território.'))
                 raise ValueError(self.tr(
                     'Erro ao baixar os arquivos raster.'
                     '\nTodos os arquivos necessários falharam no download.'
