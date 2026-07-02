@@ -17,24 +17,12 @@ ZIP_FILE="$OUTPUT_DIR/${PLUGIN_NAME}_${VERSION}.zip"
 cd "$OUTPUT_DIR" || exit 1
 
 zip -r "$ZIP_FILE" "$PLUGIN_NAME" \
-  -x "$PLUGIN_NAME/.git/*" \
-  "$PLUGIN_NAME/.gitignore" \
-  "$PLUGIN_NAME/.DS_Store" \
-  "$PLUGIN_NAME/__pycache__/*" \
-  "$PLUGIN_NAME/*.pyc" \
-  "$PLUGIN_NAME/*.zip" \
-  "$PLUGIN_NAME/package.sh" \
-  "$PLUGIN_NAME/.venv/*" \
-  "$PLUGIN_NAME/.vscode/*" \
-  "$PLUGIN_NAME/test/*" \
-  "$PLUGIN_NAME/Support/*" \
-  "$PLUGIN_NAME/Makefile" \
-  "$PLUGIN_NAME/pb_tool.cfg" \
-  "$PLUGIN_NAME/pyrightconfig.json" \
-  "$PLUGIN_NAME/plugin_upload.py" \
-  "$PLUGIN_NAME/pylintrc" \
-  "$PLUGIN_NAME/help/*" \
-  "$PLUGIN_NAME/i18n/*"
+  --exclude "$PLUGIN_NAME/.git/*" \
+  --exclude "$PLUGIN_NAME/.gitignore" \
+  --exclude "$PLUGIN_NAME/__pycache__/*" \
+  --exclude "$PLUGIN_NAME/*.pyc" \
+  --exclude "$PLUGIN_NAME/scripts/*" \
+  --exclude "$PLUGIN_NAME/package.sh"
 
 echo "Created: $ZIP_FILE"
 ls -lh "$ZIP_FILE"

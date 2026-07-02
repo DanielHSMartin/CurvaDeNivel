@@ -128,7 +128,9 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterEnum(
                 name=self.FONTE_DEM,
                 description=self.tr('Fonte de dados de elevação'),
-                options=['INPE TOPODATA (Brasil)', 'Copernicus GLO-30 (Mundial)'],
+                options=[
+                    'INPE TOPODATA (Brasil)',
+                    'Copernicus GLO-30 (Mundial)'],
                 defaultValue=0,
                 optional=False
             )
@@ -210,18 +212,24 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 self.tr(
                     'Área de interesse inválida (valores NaN detectados).\n\n'
                     'Isso pode ocorrer quando:\n'
-                    '- Uma camada de polígono é selecionada mas não foi salva\n'
+                    '- Uma camada de polígono é selecionada'
+                    ' mas não foi salva\n'
                     '- A camada está vazia ou não tem geometrias válidas\n\n'
                     'Por favor:\n'
-                    '1. Desenhe um retângulo diretamente usando a ferramenta de extent, OU\n'
-                    '2. Se usar uma camada de polígono, certifique-se de salvá-la primeiro'))
+                    '1. Desenhe um retângulo diretamente'
+                    ' usando a ferramenta de extent, OU\n'
+                    '2. Se usar uma camada de polígono,'
+                    ' certifique-se de salvá-la primeiro'))
 
         geometria_area_interesse = QgsGeometry.fromRect(area_interesse)
 
         # Valida se a geometria foi criada com sucesso
-        if geometria_area_interesse.isNull() or geometria_area_interesse.isEmpty():
+        if (geometria_area_interesse.isNull()
+                or geometria_area_interesse.isEmpty()):
             raise ValueError(
-                self.tr('Não foi possível criar a geometria da área de interesse.'))
+                self.tr(
+                    'Não foi possível criar a geometria'
+                    ' da área de interesse.'))
 
         caminho_shp_area_interesse = os.path.join(
             self.temp_dir, 'area_interesse.shp')
@@ -241,7 +249,9 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
         if ogr_geometria is None:
             raise ValueError(self.tr(
-                'Erro ao converter a geometria para o formato OGR. WKT: {}').format(wkt_geometria))
+                'Erro ao converter a geometria para'
+                ' o formato OGR. WKT: {}'
+            ).format(wkt_geometria))
 
         feature.SetGeometry(ogr_geometria)
         layer_area_interesse.CreateFeature(feature)
@@ -257,7 +267,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         cor_curva = self.parameterAsColor(parameters, self.COR_CURVAS, context)
 
         # Carrega a opção de gerar overlay de elevação
-        gerar_mapa_elevacao = self.parameterAsBool(parameters, self.ELEVATION_MAP, context)
+        gerar_mapa_elevacao = self.parameterAsBool(
+            parameters, self.ELEVATION_MAP, context)
 
         # Carrega a fonte de DEM selecionada (0 = INPE, 1 = Copernicus)
         fonte_dem = self.parameterAsEnum(parameters, self.FONTE_DEM, context)
@@ -292,7 +303,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                     + proxy_user)
             except Exception as e:
                 feedback.pushInfo(
-                    '\nErro ao carregar dados de autenticação de proxy: ' + str(e))
+                    '\nErro ao carregar dados de autenticação de proxy: '
+                    + str(e))
 
         # Define callback da biblioteca gdal
         def callback_gdal(info, *args):
@@ -309,7 +321,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             lat_norte = 6.0
             lon_oeste = -75.0
 
-            feedback.pushInfo('\nCalculando arquivos raster necessários (INPE TOPODATA)')
+            feedback.pushInfo(
+                '\nCalculando arquivos raster necessários (INPE TOPODATA)')
             while (lat_norte > -34.0):
                 lon_oeste = -75.0
                 while (lon_oeste < -34.5):
@@ -319,7 +332,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                         QgsPointXY(lon_oeste + 1.5, lat_norte - 1.0),
                         QgsPointXY(lon_oeste, lat_norte - 1.0)]
                     poly = QgsGeometry.fromPolygonXY([points])
-                    if not poly.intersection(geometria_area_interesse).isEmpty():
+                    if not poly.intersection(
+                            geometria_area_interesse).isEmpty():
                         nome_raster = list("00S00_ZN")
                         nome_raster[0] = str(abs(int(lat_norte / 10)))
                         nome_raster[1] = str(abs(int(lat_norte)) % 10)
@@ -334,16 +348,20 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                         if ''.join(nome_raster) not in lista_rasters:
                             lista_rasters.append(''.join(nome_raster))
                             feedback.pushInfo(
-                                'Arquivo necessário: ' + ''.join(nome_raster) + '.tif')
+                                'Arquivo necessário: '
+                                + ''.join(nome_raster) + '.tif')
                     lon_oeste += 1.5
                 lat_norte -= 1.0
 
             if not lista_rasters:
                 feedback.pushInfo(
-                    '\nNenhum arquivo raster encontrado para a área selecionada.'
-                    '\nA base de dados TOPODATA do INPE cobre apenas o território brasileiro.'
+                    '\nNenhum arquivo raster encontrado'
+                    ' para a área selecionada.'
+                    '\nA base de dados TOPODATA do INPE cobre'
+                    ' apenas o território brasileiro.'
                     '\nCobertura: lat -34°S a 6°N, lon -75°O a -34°O'
-                    '\nVerifique se a área de interesse está dentro do Brasil.')
+                    '\nVerifique se a área de interesse'
+                    ' está dentro do Brasil.')
                 return {}
 
             numeroDeEtapas = 5 + 2 * len(lista_rasters)
@@ -356,16 +374,22 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 if feedback.isCanceled():
                     feedback.pushInfo('\nCancelado pelo usuário')
                     return {}
-                feedback.pushInfo('\nBuscando arquivo Raster: ' + raster + '.tif')
-                if os.path.exists(os.path.join(self.temp_dir, raster + '.tif')):
+                feedback.pushInfo(
+                    '\nBuscando arquivo Raster: ' + raster + '.tif')
+                if os.path.exists(
+                        os.path.join(self.temp_dir, raster + '.tif')):
                     feedback.pushInfo('Arquivo localizado no disco')
                 else:
-                    feedback.pushInfo('Baixando arquivo raster: ' + raster + '.zip')
+                    feedback.pushInfo(
+                        'Baixando arquivo raster: ' + raster + '.zip')
                     raster_url = caminho_raster + raster + '.zip'
                     try:
-                        opener = proxy_opener if proxy_opener else urllib.request.build_opener()
+                        opener = (
+                            proxy_opener if proxy_opener
+                            else urllib.request.build_opener())
                         with opener.open(raster_url, timeout=30) as response:
-                            total_size = int(response.headers.get('Content-Length', 0))
+                            total_size = int(
+                                response.headers.get('Content-Length', 0))
                             chunks = []
                             bytes_received = 0
                             chunk_size = 65536
@@ -376,9 +400,12 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                                 chunks.append(chunk)
                                 bytes_received += len(chunk)
                                 if total_size > 0:
-                                    progresso_download = self.progresso + bytes_received / total_size
-                                    feedback.setProgress(
-                                        int(progresso_download * self.status_total))
+                                    progresso_download = (
+                                        self.progresso
+                                        + bytes_received / total_size)
+                                    feedback.setProgress(int(
+                                        progresso_download
+                                        * self.status_total))
                             content = b''.join(chunks)
                         if content:
                             with tempfile.TemporaryFile() as zip:
@@ -387,17 +414,23 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                                     files = zf.namelist()
                                     for filename in files:
                                         feedback.pushInfo(
-                                            'Descompactando arquivo: ' + filename)
-                                        file_path = os.path.join(self.temp_dir, filename)
+                                            'Descompactando arquivo: '
+                                            + filename)
+                                        file_path = os.path.join(
+                                            self.temp_dir, filename)
                                         with open(file_path, 'wb') as f:
                                             f.write(zf.read(filename))
                         else:
                             raise ValueError('Resposta vazia do servidor')
                     except Exception as e:
-                        feedback.pushInfo('\nErro ao baixar o arquivo: ' + raster_url)
-                        feedback.pushInfo('\nVerifique o proxy ou a conexão com a internet')
                         feedback.pushInfo(
-                            '\nCopie e cole o link acima no navegador para testar manualmente')
+                            '\nErro ao baixar o arquivo: ' + raster_url)
+                        feedback.pushInfo(
+                            '\nVerifique o proxy ou a conexão'
+                            ' com a internet')
+                        feedback.pushInfo(
+                            '\nCopie e cole o link acima no'
+                            ' navegador para testar manualmente')
                         feedback.pushInfo('\nDetalhe do erro: ' + str(e))
                         lista_rasters.remove(raster)
                 self.progresso += 1
@@ -407,10 +440,12 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 feedback.pushInfo(
                     '\nErro ao baixar os arquivos raster.'
                     '\nTodos os arquivos necessários falharam no download.'
-                    '\nVerifique a conexão com a internet ou o proxy e tente novamente.')
+                    '\nVerifique a conexão com a internet ou'
+                    ' o proxy e tente novamente.')
                 return {}
 
-            feedback.pushInfo('\nRecortando arquivos raster pela área de interesse')
+            feedback.pushInfo(
+                '\nRecortando arquivos raster pela área de interesse')
             raster_clips = []
             for raster in lista_rasters:
                 fn_in = os.path.join(self.temp_dir, raster + '.tif')
@@ -434,10 +469,13 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 feedback.setProgress(int(self.progresso * self.status_total))
 
             if not raster_clips:
-                feedback.pushInfo('\nNenhum arquivo foi recortado com sucesso.')
+                feedback.pushInfo(
+                    '\nNenhum arquivo foi recortado com sucesso.')
                 return {}
 
-            feedback.pushInfo('\nJuntando arquivos raster recortados pela área de interesse')
+            feedback.pushInfo(
+                '\nJuntando arquivos raster recortados'
+                ' pela área de interesse')
             gdal.Warp(
                 os.path.join(self.temp_dir, 'merged.tif'),
                 raster_clips,
@@ -459,7 +497,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             east = area_interesse.xMaximum()
 
             tile_list = []
-            feedback.pushInfo('\nCalculando tiles Copernicus GLO-30 necessários')
+            feedback.pushInfo(
+                '\nCalculando tiles Copernicus GLO-30 necessários')
             for lat in range(math.floor(south), math.ceil(north)):
                 for lon in range(math.floor(west), math.ceil(east)):
                     tile_points = [
@@ -468,18 +507,23 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                         QgsPointXY(lon + 1, lat + 1),
                         QgsPointXY(lon, lat + 1)]
                     tile_poly = QgsGeometry.fromPolygonXY([tile_points])
-                    if tile_poly.intersection(geometria_area_interesse).isEmpty():
+                    if tile_poly.intersection(
+                            geometria_area_interesse).isEmpty():
                         continue
                     ns = 'N' if lat >= 0 else 'S'
                     ew = 'E' if lon >= 0 else 'W'
-                    tile_name = 'Copernicus_DSM_COG_10_{}{:02d}_00_{}{:03d}_00_DEM'.format(
-                        ns, abs(lat), ew, abs(lon))
+                    tile_name = (
+                        'Copernicus_DSM_COG_10_'
+                        '{}{:02d}_00_{}{:03d}_00_DEM'
+                    ).format(ns, abs(lat), ew, abs(lon))
                     if tile_name not in tile_list:
                         tile_list.append(tile_name)
                         feedback.pushInfo('Tile necessário: ' + tile_name)
 
             if not tile_list:
-                feedback.pushInfo('\nNenhum tile Copernicus encontrado para a área selecionada.')
+                feedback.pushInfo(
+                    '\nNenhum tile Copernicus encontrado'
+                    ' para a área selecionada.')
                 return {}
 
             numeroDeEtapas = 5 + 2 * len(tile_list)
@@ -501,9 +545,12 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                         COPERNICUS_BASE_URL, tile_name, tile_name)
                     feedback.pushInfo('Baixando: ' + tile_url)
                     try:
-                        opener = proxy_opener if proxy_opener else urllib.request.build_opener()
+                        opener = (
+                            proxy_opener if proxy_opener
+                            else urllib.request.build_opener())
                         with opener.open(tile_url, timeout=60) as response:
-                            total_size = int(response.headers.get('Content-Length', 0))
+                            total_size = int(
+                                response.headers.get('Content-Length', 0))
                             chunks = []
                             bytes_received = 0
                             chunk_size = 65536
@@ -514,9 +561,12 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                                 chunks.append(chunk)
                                 bytes_received += len(chunk)
                                 if total_size > 0:
-                                    progresso_download = self.progresso + bytes_received / total_size
-                                    feedback.setProgress(
-                                        int(progresso_download * self.status_total))
+                                    progresso_download = (
+                                        self.progresso
+                                        + bytes_received / total_size)
+                                    feedback.setProgress(int(
+                                        progresso_download
+                                        * self.status_total))
                             content = b''.join(chunks)
                         if content:
                             with open(local_tif, 'wb') as f:
@@ -527,9 +577,11 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                         if e.code == 404:
                             feedback.pushInfo(
                                 'AVISO: Tile não disponível (HTTP 404) — '
-                                'pode ser área oceânica ou tile restrito: ' + tile_name)
+                                'pode ser área oceânica ou tile'
+                                ' restrito: ' + tile_name)
                         else:
-                            feedback.pushInfo('\nErro HTTP ao baixar tile: ' + str(e))
+                            feedback.pushInfo(
+                                '\nErro HTTP ao baixar tile: ' + str(e))
                             feedback.pushInfo('URL: ' + tile_url)
                         tile_list.remove(tile_name)
                     except Exception as e:
@@ -572,7 +624,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 feedback.pushInfo('\nNenhum tile foi recortado com sucesso.')
                 return {}
 
-            feedback.pushInfo('\nJuntando tiles recortados pela área de interesse')
+            feedback.pushInfo(
+                '\nJuntando tiles recortados pela área de interesse')
             gdal.Warp(
                 os.path.join(self.temp_dir, 'merged.tif'),
                 raster_clips,
@@ -593,7 +646,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
         # Guarda cópia do DEM antes da suavização para o overlay de elevação
         elevation_dem_path = os.path.join(self.temp_dir, 'elevation.tif')
-        shutil.copy2(os.path.join(self.temp_dir, 'merged.tif'), elevation_dem_path)
+        shutil.copy2(
+            os.path.join(self.temp_dir, 'merged.tif'), elevation_dem_path)
 
         # Faz suavização
         self.suavizaTerreno(suavizar, feedback)
@@ -608,7 +662,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
         # Gera as curvas de nível a partir da imagem unificada
         feedback.pushInfo('\nGerando curvas de nível')
-        tmp_shp_dir = tempfile.mkdtemp(dir=self.temp_dir, prefix='curvasdenivel_')
+        tmp_shp_dir = tempfile.mkdtemp(
+            dir=self.temp_dir, prefix='curvasdenivel_')
         caminho_shp_temp = os.path.join(tmp_shp_dir, 'curvasdenivel.shp')
         shp_temp = shp_driver.CreateDataSource(caminho_shp_temp)
         srs_4326 = osr.SpatialReference()
@@ -647,8 +702,10 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
         # Reprojecta para o CRS do projeto se necessário
         project_crs = context.project().crs()
-        if project_crs.isValid() and project_crs.authid().upper() != 'EPSG:4326':
-            feedback.pushInfo('\nReprojectando curvas para ' + project_crs.authid())
+        if (project_crs.isValid()
+                and project_crs.authid().upper() != 'EPSG:4326'):
+            feedback.pushInfo(
+                '\nReprojectando curvas para ' + project_crs.authid())
             tmp_reproj_dir = tempfile.mkdtemp(
                 dir=self.temp_dir, prefix='curvasdenivel_reproj_')
             caminho_shp_reproj = os.path.join(
@@ -665,7 +722,8 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
         # Carrega camada de curvas de nível
         layer = QgsVectorLayer(caminho_shp_final, 'Curvas De Nivel')
-        feedback.pushInfo('Numero de curvas geradas: ' + str(len(list(layer.getFeatures()))))
+        num_curvas = len(list(layer.getFeatures()))
+        feedback.pushInfo('Numero de curvas geradas: ' + str(num_curvas))
 
         # Modifica a simbologia
         layer_curvas = layer
@@ -697,10 +755,12 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         curva_mestra_rule = root_rule.children()[0]
         if Qgis.QGIS_VERSION_INT < 33000:
             mask.setMaskedSymbolLayers([QgsSymbolLayerReference(
-                layer_curvas.id(), QgsSymbolLayerId(curva_mestra_rule.ruleKey(), 0))])
+                layer_curvas.id(),
+                QgsSymbolLayerId(curva_mestra_rule.ruleKey(), 0))])
         else:
             mask.setMaskedSymbolLayers([QgsSymbolLayerReference(
-                layer_curvas.id(), curva_mestra_rule.symbol().symbolLayer(0).id())])
+                layer_curvas.id(),
+                curva_mestra_rule.symbol().symbolLayer(0).id())])
         mask.setEnabled(True)
 
         textFormat = QgsTextFormat()
@@ -709,7 +769,9 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         textFormat.setMask(mask)
 
         settings = QgsPalLayerSettings()
-        settings.fieldName = f'CASE WHEN "ELEV" % {intervalo*5} = 0 THEN "ELEV" ELSE \'\' END'
+        settings.fieldName = (
+            f'CASE WHEN "ELEV" % {intervalo*5} = 0'
+            f' THEN "ELEV" ELSE \'\' END')
         settings.enabled = True
         settings.drawLabels = True
         settings.repeatDistance = 50
@@ -731,13 +793,15 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
 
         feedback.pushInfo('\n')
 
-        # Adiciona Elevation Overlay raster (inserido abaixo das curvas de nível)
+        # Adiciona Elevation Overlay raster
+        # (inserido abaixo das curvas de nível)
         if gerar_mapa_elevacao:
             feedback.pushInfo('\nAdicionando camada de Elevation Overlay')
 
             qml_path = os.path.splitext(elevation_dem_path)[0] + '.qml'
             qml = (
-                '<!DOCTYPE qgis PUBLIC \'http://mrcc.com/qgis.dtd\' \'SYSTEM\'>\n'
+                '<!DOCTYPE qgis PUBLIC '
+                '\'http://mrcc.com/qgis.dtd\' \'SYSTEM\'>\n'
                 '<qgis version="3.0" styleCategories="AllStyleCategories">\n'
                 '  <pipe>\n'
                 '    <provider>\n'
@@ -750,10 +814,12 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 ' multidirectionlighting="0" zFactor="1">\n'
                 '      <rasterTransparency/>\n'
                 '    </rasterrenderer>\n'
-                '    <brightnesscontrast brightness="0" contrast="0" gamma="1"/>\n'
+                '    <brightnesscontrast brightness="0"'
+                ' contrast="0" gamma="1"/>\n'
                 '    <huesaturation saturation="0" grayscaleMode="0"'
                 ' colorizeOn="0" colorizeRed="255" colorizeGreen="128"'
-                ' colorizeBlue="128" colorizeStrength="100" invertColors="0"/>\n'
+                ' colorizeBlue="128" colorizeStrength="100"'
+                ' invertColors="0"/>\n'
                 '    <rasterresampler maxOversampling="2"'
                 ' zoomedInResampler="cubic" zoomedOutResampler="cubic"/>\n'
                 '  </pipe>\n'
@@ -764,12 +830,14 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
                 f.write(qml)
             feedback.pushInfo('QML gravado: ' + qml_path)
 
-            dem_layer = QgsRasterLayer(elevation_dem_path, 'Elevação (Hillshade)')
+            dem_layer = QgsRasterLayer(
+                elevation_dem_path, 'Elevação (Hillshade)')
             if dem_layer.isValid():
                 QgsProject.instance().addMapLayer(dem_layer)
             else:
                 feedback.pushInfo(
-                    'Aviso: Não foi possível carregar a camada de Elevação (Hillshade)')
+                    'Aviso: Não foi possível carregar'
+                    ' a camada de Elevação (Hillshade)')
 
         # Adiciona camada ao projeto e retorna
         QgsProject.instance().addMapLayer(layer_curvas)
@@ -805,7 +873,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         data = data.replace("ComplexSource", "KernelFilteredSource")
         data = data.replace(
             "<NODATA>-32768</NODATA>",
-            '<NODATA>-32768</NODATA><Kernel normalized="1"><Size>3</Size><Coefs>0.077847 0.123317 0.077847 0.123317 0.195346 0.123317 0.077847 0.123317 0.077847</Coefs></Kernel>'
+            '<NODATA>-32768</NODATA><Kernel normalized="1"><Size>3</Size><Coefs>0.077847 0.123317 0.077847 0.123317 0.195346 0.123317 0.077847 0.123317 0.077847</Coefs></Kernel>'  # noqa: E501
         )
         with open(os.path.join(path, "dem_blur_3x3.vrt"), "wt") as file:
             file.write(data)
@@ -841,7 +909,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
         data = data.replace("ComplexSource", "KernelFilteredSource")
         data = data.replace(
             "<NODATA>-32768</NODATA>",
-            '<NODATA>-32768</NODATA><Kernel normalized="1"><Size>9</Size><Coefs>0 0.000001 0.000014 0.000055 0.000088 0.000055 0.000014 0.000001 0 0.000001 0.000036 0.000362 0.001445 0.002289 0.001445 0.000362 0.000036 0.000001 0.000014 0.000362 0.003672 0.014648 0.023205 0.014648 0.003672 0.000362 0.000014 0.000055 0.001445 0.014648 0.058434 0.092566 0.058434 0.014648 0.001445 0.000055 0.000088 0.002289 0.023205 0.092566 0.146634 0.092566 0.023205 0.002289 0.000088 0.000055 0.001445 0.014648 0.058434 0.092566 0.058434 0.014648 0.001445 0.000055 0.000014 0.000362 0.003672 0.014648 0.023205 0.014648 0.003672 0.000362 0.000014 0.000001 0.000036 0.000362 0.001445 0.002289 0.001445 0.000362 0.000036 0.000001 0 0.000001 0.000014 0.000055 0.000088 0.000055 0.000014 0.000001 0</Coefs></Kernel>'
+            '<NODATA>-32768</NODATA><Kernel normalized="1"><Size>9</Size><Coefs>0 0.000001 0.000014 0.000055 0.000088 0.000055 0.000014 0.000001 0 0.000001 0.000036 0.000362 0.001445 0.002289 0.001445 0.000362 0.000036 0.000001 0.000014 0.000362 0.003672 0.014648 0.023205 0.014648 0.003672 0.000362 0.000014 0.000055 0.001445 0.014648 0.058434 0.092566 0.058434 0.014648 0.001445 0.000055 0.000088 0.002289 0.023205 0.092566 0.146634 0.092566 0.023205 0.002289 0.000088 0.000055 0.001445 0.014648 0.058434 0.092566 0.058434 0.014648 0.001445 0.000055 0.000014 0.000362 0.003672 0.014648 0.023205 0.014648 0.003672 0.000362 0.000014 0.000001 0.000036 0.000362 0.001445 0.002289 0.001445 0.000362 0.000036 0.000001 0 0.000001 0.000014 0.000055 0.000088 0.000055 0.000014 0.000001 0</Coefs></Kernel>'  # noqa: E501
         )
         with open(os.path.join(path, "tpi_blur_3x3.vrt"), "wt") as file:
             file.write(data)
@@ -898,7 +966,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             data = data.replace("ComplexSource", "KernelFilteredSource")
             data = data.replace(
                 "<NODATA>-32768</NODATA>",
-                '<NODATA>-32768</NODATA><Kernel normalized="1"><Size>7</Size><Coefs>0.000036 0.000363 0.001446 0.002291 0.001446 0.000363 0.000036 0.000363 0.003676 0.014662 0.023226 0.014662 0.003676 0.000363 0.001446 0.014662 0.058488 0.092651 0.058488 0.014662 0.001446 0.002291 0.023226 0.092651 0.146768 0.092651 0.023226 0.002291 0.001446 0.014662 0.058488 0.092651 0.058488 0.014662 0.001446 0.000363 0.003676 0.014662 0.023226 0.014662 0.003676 0.000363 0.000036 0.000363 0.001446 0.002291 0.001446 0.000363 0.000036</Coefs></Kernel>'
+                '<NODATA>-32768</NODATA><Kernel normalized="1"><Size>7</Size><Coefs>0.000036 0.000363 0.001446 0.002291 0.001446 0.000363 0.000036 0.000363 0.003676 0.014662 0.023226 0.014662 0.003676 0.000363 0.001446 0.014662 0.058488 0.092651 0.058488 0.014662 0.001446 0.002291 0.023226 0.092651 0.146768 0.092651 0.023226 0.002291 0.001446 0.014662 0.058488 0.092651 0.058488 0.014662 0.001446 0.000363 0.003676 0.014662 0.023226 0.014662 0.003676 0.000363 0.000036 0.000363 0.001446 0.002291 0.001446 0.000363 0.000036</Coefs></Kernel>'  # noqa: E501
             )
             with open(os.path.join(path, "dem_blur_7x7.vrt"), "wt") as file:
                 file.write(data)
@@ -923,7 +991,7 @@ class CurvaDeNivelAlgorithm(QgsProcessingAlgorithm):
             data = data.replace("ComplexSource", "KernelFilteredSource")
             data = data.replace(
                 "<NODATA>-32768</NODATA>",
-                '<NODATA>-32768</NODATA><Kernel normalized="1"><Size>13</Size><Coefs>0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.000001 0.000001 0.000001 0 0 0 0 0 0 0 0 0.000001 0.000014 0.000055 0.000088 0.000055 0.000014 0.000001 0 0 0 0 0.000014 0.000362 0.003672 0.014648 0.023204 0.014648 0.003672 0.000362 0.000014 0 0 0 0.000001 0.000055 0.001445 0.014648 0.058433 0.092564 0.058433 0.014648 0.001445 0.000055 0.000001 0 0 0.000001 0.000088 0.002289 0.023204 0.092564 0.146632 0.092564 0.023204 0.002289 0.000088 0.000001 0 0 0.000001 0.000055 0.001445 0.014648 0.058433 0.092564 0.058433 0.014648 0.001445 0.000055 0.000001 0 0 0 0.000014 0.000362 0.003672 0.014648 0.023204 0.014648 0.003672 0.000362 0.000014 0 0 0 0 0.000001 0.000036 0.000362 0.001445 0.002289 0.001445 0.000362 0.000036 0.000001 0 0 0 0 0 0.000001 0.000014 0.000055 0.000088 0.000055 0.000014 0.000001 0 0 0 0 0 0 0 0 0.000001 0.000001 0.000001 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</Coefs></Kernel>'
+                '<NODATA>-32768</NODATA><Kernel normalized="1"><Size>13</Size><Coefs>0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.000001 0.000001 0.000001 0 0 0 0 0 0 0 0 0.000001 0.000014 0.000055 0.000088 0.000055 0.000014 0.000001 0 0 0 0 0.000014 0.000362 0.003672 0.014648 0.023204 0.014648 0.003672 0.000362 0.000014 0 0 0 0.000001 0.000055 0.001445 0.014648 0.058433 0.092564 0.058433 0.014648 0.001445 0.000055 0.000001 0 0 0.000001 0.000088 0.002289 0.023204 0.092564 0.146632 0.092564 0.023204 0.002289 0.000088 0.000001 0 0 0.000001 0.000055 0.001445 0.014648 0.058433 0.092564 0.058433 0.014648 0.001445 0.000055 0.000001 0 0 0 0.000014 0.000362 0.003672 0.014648 0.023204 0.014648 0.003672 0.000362 0.000014 0 0 0 0 0.000001 0.000036 0.000362 0.001445 0.002289 0.001445 0.000362 0.000036 0.000001 0 0 0 0 0 0.000001 0.000014 0.000055 0.000088 0.000055 0.000014 0.000001 0 0 0 0 0 0 0 0 0.000001 0.000001 0.000001 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</Coefs></Kernel>'  # noqa: E501
             )
             with open(os.path.join(path, "dem_blur_13x13.vrt"), "wt") as file:
                 file.write(data)
