@@ -72,7 +72,9 @@ cd "$OUTPUT_DIR" || exit 1
 zip -r "$ZIP_FILE" "$PLUGIN_NAME" "${EXCLUDES[@]}"
 
 echo "--- 4/4 Suspicious files in zip ---"
-HIDDEN=$(unzip -Z1 "$ZIP_FILE" | grep -E '(^|/)\.[^/]+$' || true)
+# Matches any dot-prefixed path segment, so a hidden directory (and any
+# file nested inside one) is caught, not just a hidden file at the end.
+HIDDEN=$(unzip -Z1 "$ZIP_FILE" | grep -E '(^|/)\.[^/]+(/|$)' || true)
 if [ -n "$HIDDEN" ]; then
   echo "Error: hidden files ended up in the zip (add them to EXCLUDES in package.sh):"
   echo "$HIDDEN"
