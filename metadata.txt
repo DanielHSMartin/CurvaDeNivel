@@ -8,7 +8,7 @@ qgisMinimumVersion=3.16
 qgisMaximumVersion=4.99
 description=Creates contour lines from elevation data (INPE TOPODATA for Brazil or Copernicus GLO-30 worldwide)
 description[pt_br]=Cria curvas de nível a partir de dados de elevação (INPE TOPODATA para o Brasil ou Copernicus GLO-30 para o mundo todo)
-version=1.1.3
+version=1.1.4
 author=Daniel Hulshof Saint Martin
 email=daniel.hulshof@gmail.com
 
@@ -24,6 +24,11 @@ repository=https://github.com/DanielHSMartin/CurvaDeNivel
 hasProcessingProvider=yes
 # Uncomment the following line and add your changelog:
 changelog=
+    Versão 1.1.4
+    - Corrigido o nível de suavização "Alto": o kernel gaussiano 13x13 tinha 155 coeficientes em vez de 169, e o GDAL rejeitava o filtro. Só esse nível era afetado; os demais funcionavam normalmente.
+    - O nível "Alto" agora suaviza de fato mais que o "Médio". Antes os dois usavam o mesmo desvio-padrão e produziam resultados praticamente idênticos.
+    - Corrigido o ícone do plugin: metadata.txt apontava para icon.png, que não existe no pacote; o arquivo correto é logo.png.
+    - Corrigida a compatibilidade com Qt6: quatro enums eram acessados sem o escopo do tipo (QgsProcessingAlgorithm.Flag, QgsProcessingParameterNumber.Type, QgsPalLayerSettings.Placement e QgsPalLayerSettings.LinePlacementFlags). No Qt6 os enums passaram a ser escopados e esses acessos falhavam; a forma escopada também funciona no Qt5.
     Versão 1.1.3
     - Corrigido download do INPE TOPODATA: o servidor antigo (www.dsr.inpe.br) entrou em loop de redirecionamento HTTP/HTTPS; o plugin agora usa o catálogo oficial Brazil Data Cube (data.inpe.br) e informa um erro claro caso o download falhe, em vez de terminar silenciosamente sem gerar camada.
     - Overlay de elevação (Hillshade) agora vem desmarcado por padrão.
@@ -61,7 +66,7 @@ tags[pt_br]=python, gdal, curva de nível, curvas de nível, altimetria, elevaç
 
 homepage=https://github.com/DanielHSMartin/CurvaDeNivel
 category=Analysis
-icon=icon.png
+icon=logo.png
 # experimental flag
 experimental=False
 
